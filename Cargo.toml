@@ -1,0 +1,8 @@
+[package]
+name = "rustynes"
+version = "0.1.0"
+authors = ["daniel_lopez <dlope073@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+ggez = "0.5.0-rc.2"

@@ -100,7 +100,7 @@ fn test_instruction_lda_zero_page() {
     let nes = Nes::new();
     {
         let mut memory = nes.memory.borrow_mut();
-        memory[1] = 255; // Set the operand to 69 😊
+        memory[1] = 255;
         memory[255] = 69;
     }
     nes.program_counter.set(0);
@@ -123,42 +123,83 @@ fn test_instruction_lda_zero_page_x() {
     let nes = Nes::new();
     {
         let mut memory = nes.memory.borrow_mut();
-        memory[1] = 255; // Set the operand to 69 😊
-        memory[255 +255] = 69;
+        memory[1] = 100;
+        memory[101] = 69;
         nes.X.set(1);
     }
     nes.program_counter.set(0);
     instruction_lda_zero_page_x(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.A.get(), 69);
 }
 
 fn instruction_lda_absolute(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
-    let operand : u16 = ((memory[pc+1] as u16) << 0x0) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
+    let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
     nes.A.set(memory[operand as usize]);
     nes.program_counter.set((pc+3) as u16);
+}
+
+#[test]
+fn test_instruction_lda_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2048] = 69;
+    }
+    nes.program_counter.set(0);
+    instruction_lda_absolute(&nes);
+    assert_eq!(nes.A.get(), 69);
 }
 
 fn instruction_lda_absolute_x(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
     let X = nes.X.get() as u16;
-    let operand : u16 = ((memory[pc+1] as u16) << 0x0) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
-     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.A.set(memory[((operand + X) % 256) as usize]);
+    let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    nes.A.set(memory[(operand + X) as usize]);
     nes.program_counter.set(((pc+3) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_lda_absolute_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2048+255] = 69;
+        nes.X.set(255);
+    }
+    nes.program_counter.set(0);
+    instruction_lda_absolute_x(&nes);
+    assert_eq!(nes.A.get(), 69);
 }
 
 fn instruction_lda_absolute_y(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
     let Y = nes.Y.get() as u16;
-    let operand : u16 = ((memory[pc+1] as u16) << 0x0) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
+    let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.A.set(memory[((operand + Y) % 256) as usize]);
+    nes.A.set(memory[(operand + Y) as usize]);
     nes.program_counter.set(((pc+3) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_lda_absolute_y() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2048+255] = 69;
+        nes.Y.set(255);
+    }
+    nes.program_counter.set(0);
+    instruction_lda_absolute_y(&nes);
+    assert_eq!(nes.A.get(), 69);
 }
 
 fn instruction_lda_indirect_x(nes : &Nes) {

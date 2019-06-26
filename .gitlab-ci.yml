@@ -14,9 +14,8 @@ image: "rust:latest"
 # Optional: Install a C compiler, cmake and git into the container.
 # You will often need this when you (or any of your dependencies) depends on C code.
 before_script:
-    - apt-get update -qy
     - apt-get install -y build-essential
-    - apt-get install libsdl2-dev
+    - apt-get install -y libsdl2-dev
 
 # Use cargo to test the project
 test:cargo:

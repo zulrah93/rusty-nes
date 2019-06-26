@@ -208,18 +208,50 @@ fn instruction_lda_indirect_x(nes : &Nes) {
     let X = nes.X.get() as u16;
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.A.set(memory[memory[((operand + X) % 256) as usize] as usize]);
+    let address = ((operand + X) % 256) as usize;
+    nes.A.set(memory[((memory[address+1] as usize) << 8) | (memory[address] as usize)] as u8);
     nes.program_counter.set(((pc+3) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_lda_indirect_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 1;
+        memory[256] = 8;
+        memory[2048] = 69;
+        nes.X.set(254);
+    }
+    nes.program_counter.set(0);
+    instruction_lda_indirect_x(&nes);
+    assert_eq!(nes.A.get(), 69);
 }
 
 fn instruction_lda_indirect_indexed(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
-    let Y = nes.Y.get();
+    let Y = nes.Y.get() as usize;
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.A.set(memory[(memory[operand as usize] + Y) as usize]);
+    let address = ((memory[(operand+1) as usize] as usize) << 8) | (memory[operand as usize] as usize); 
+    nes.A.set(memory[(address + Y) as usize] as u8);
     nes.program_counter.set(((pc+3) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_lda_indirect_indexed() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 253;
+        memory[254] = 8;
+        memory[2048+254] = 69;
+        nes.Y.set(254);
+    }
+    nes.program_counter.set(0);
+    instruction_lda_indirect_indexed(&nes);
+    assert_eq!(nes.A.get(), 69);
 }
 
 

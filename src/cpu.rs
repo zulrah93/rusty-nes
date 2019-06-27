@@ -44,6 +44,12 @@ impl CPU {
         opcodes.insert(0x84, instruction_sty_zero_page);
         opcodes.insert(0x94, instruction_sty_zero_page_x);
         opcodes.insert(0x8c, instruction_sty_absolute);
+        opcodes.insert(0xaa, instruction_tax);
+        opcodes.insert(0xa8, instruction_tay);
+        opcodes.insert(0xba, instruction_tsx);
+        opcodes.insert(0x8a, instruction_txa);
+        opcodes.insert(0x9a, instruction_txs);
+        opcodes.insert(0x98, instruction_tya);
         CPU {opcodes: opcodes}
     }
 
@@ -815,4 +821,116 @@ fn test_instruction_sty_zero_page_x() {
     instruction_sty_zero_page_x(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[20], 69);
+}
+
+// TAX opcode
+
+fn instruction_tax(nes : &Nes) {
+    let A = nes.A.get();
+    update_processor_status_flag(A as u16, &nes.processor_status_flag);
+    nes.X.set(A);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_tax() {
+     let nes = Nes::new();
+     nes.A.set(69);
+     instruction_tax(&nes);
+     assert_eq!(nes.X.get(), 69);
+}
+
+
+// TAY opcode
+
+fn instruction_tay(nes : &Nes) {
+    let A = nes.A.get();
+    update_processor_status_flag(A as u16, &nes.processor_status_flag);
+    nes.Y.set(A);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_tay() {
+     let nes = Nes::new();
+     nes.A.set(69);
+     instruction_tay(&nes);
+     assert_eq!(nes.Y.get(), 69);
+}
+
+//TSX Opcode
+
+fn instruction_tsx(nes : &Nes) {
+    let stack_ptr = nes.stack_pointer.get();
+    update_processor_status_flag(stack_ptr as u16, &nes.processor_status_flag);
+    nes.X.set(stack_ptr);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_tsx() {
+     let nes = Nes::new();
+     nes.stack_pointer.set(69);
+     instruction_tsx(&nes);
+     assert_eq!(nes.X.get(), 69);
+}
+
+
+// TXA opcode
+
+fn instruction_txa(nes : &Nes) {
+    let X = nes.X.get();
+    update_processor_status_flag(X as u16, &nes.processor_status_flag);
+    nes.A.set(X);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_txa() {
+     let nes = Nes::new();
+     nes.X.set(69);
+     instruction_txa(&nes);
+     assert_eq!(nes.A.get(), 69);
+}
+
+
+// TXS opcode
+
+fn instruction_txs(nes : &Nes) {
+    let X = nes.X.get();
+    update_processor_status_flag(X as u16, &nes.processor_status_flag);
+    nes.stack_pointer.set(X);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_txs() {
+     let nes = Nes::new();
+     nes.X.set(69);
+     instruction_txs(&nes);
+     assert_eq!(nes.stack_pointer.get(), 69);
+}
+
+
+// TYA opcode
+
+fn instruction_tya(nes : &Nes) {
+    let Y = nes.Y.get();
+    update_processor_status_flag(Y as u16, &nes.processor_status_flag);
+    nes.A.set(Y);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_tya() {
+     let nes = Nes::new();
+     nes.Y.set(69);
+     instruction_tya(&nes);
+     assert_eq!(nes.A.get(), 69);
 }

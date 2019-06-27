@@ -38,6 +38,12 @@ impl CPU {
         opcodes.insert(0x99, instruction_sta_absolute_y);
         opcodes.insert(0x81, instruction_sta_indirect_x);
         opcodes.insert(0x91, instruction_sta_indirect_indexed);
+        opcodes.insert(0x86, instruction_stx_zero_page);
+        opcodes.insert(0x96, instruction_stx_zero_page_y);
+        opcodes.insert(0x8e, instruction_stx_absolute);
+        opcodes.insert(0x84, instruction_sty_zero_page);
+        opcodes.insert(0x94, instruction_sty_zero_page_x);
+        opcodes.insert(0x8c, instruction_sty_absolute);
         CPU {opcodes: opcodes}
     }
 
@@ -669,4 +675,144 @@ fn test_instruction_sta_indirect_indexed() {
     instruction_sta_indirect_indexed(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[2048+254], 69);
+}
+
+//STX Opcodes
+fn instruction_stx_zero_page(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = memory[pc+1] as u16; 
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    memory[operand as usize] = nes.X.get();
+    nes.program_counter.set(((pc+2) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_stx_zero_page() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 0xff;
+    }
+    nes.X.set(69); 
+    instruction_stx_zero_page(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xff], 69);
+}
+
+fn instruction_stx_absolute(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16);
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    memory[operand as usize] = nes.X.get();
+    nes.program_counter.set(((pc+3) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_stx_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+    }
+    nes.X.set(69); 
+    instruction_stx_absolute(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[2048], 69);
+}
+
+
+fn instruction_stx_zero_page_y(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = memory[pc+1] as u16;
+    let Y = nes.Y.get() as u16; 
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    memory[((operand + Y) % 256) as usize] = nes.X.get();
+    nes.program_counter.set(((pc+2) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_stx_zero_page_y() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    nes.X.set(69); 
+    nes.Y.set(10);
+    instruction_stx_zero_page_y(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[20], 69);
+}
+
+// STY Opcodes
+fn instruction_sty_zero_page(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = memory[pc+1] as u16; 
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    memory[operand as usize] = nes.Y.get();
+    nes.program_counter.set(((pc+2) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_sty_zero_page() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 0xff;
+    }
+    nes.Y.set(69); 
+    instruction_sty_zero_page(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xff], 69);
+}
+
+fn instruction_sty_absolute(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16);
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    memory[operand as usize] = nes.Y.get();
+    nes.program_counter.set(((pc+3) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_sty_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+    }
+    nes.Y.set(69); 
+    instruction_sty_absolute(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[2048], 69);
+}
+
+
+fn instruction_sty_zero_page_x(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = memory[pc+1] as u16;
+    let X = nes.X.get() as u16; 
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    memory[((operand + X) % 256) as usize] = nes.Y.get();
+    nes.program_counter.set(((pc+2) as u16) as u16);
+}
+
+#[test]
+fn test_instruction_sty_zero_page_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    nes.Y.set(69); 
+    nes.X.set(10);
+    instruction_sty_zero_page_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[20], 69);
 }

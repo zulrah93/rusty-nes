@@ -3,6 +3,7 @@ extern crate ggez;
 pub mod nesfrontend;
 pub mod img;
 pub mod nes;
+pub mod cpu;
 
 use ggez::ContextBuilder;
 use ggez::event::{self};

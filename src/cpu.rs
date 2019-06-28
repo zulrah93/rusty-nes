@@ -50,6 +50,13 @@ impl CPU {
         opcodes.insert(0x8a, instruction_txa);
         opcodes.insert(0x9a, instruction_txs);
         opcodes.insert(0x98, instruction_tya);
+        opcodes.insert(0x18, instruction_clc);
+        opcodes.insert(0xd8, instruction_cld);
+        opcodes.insert(0x58, instruction_cli);
+        opcodes.insert(0xb8, instruction_clv);
+        opcodes.insert(0x38, instruction_sec);
+        opcodes.insert(0xf8, instruction_sed);
+        opcodes.insert(0x78, instruction_sei);
         CPU {opcodes: opcodes}
     }
 
@@ -933,4 +940,102 @@ fn test_instruction_tya() {
      nes.Y.set(69);
      instruction_tya(&nes);
      assert_eq!(nes.A.get(), 69);
+}
+
+//Clear opcodes (these modify the processor status flag)
+
+fn instruction_clc(nes : &Nes)  {
+    nes.processor_status_flag.set(nes.processor_status_flag.get() & 0xfe);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_clc() {
+    let nes = Nes::new();
+    nes.processor_status_flag.set(1);
+    instruction_clc(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 0);
+}
+
+fn instruction_cld(nes : &Nes)  {
+    nes.processor_status_flag.set(nes.processor_status_flag.get() & 0xf7);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_cld() {
+    let nes = Nes::new();
+    nes.processor_status_flag.set(8); // 8 == b1000
+    instruction_cld(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 0);
+}
+
+fn instruction_cli(nes : &Nes)  {
+    nes.processor_status_flag.set(nes.processor_status_flag.get() & 0xfb);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_cli() {
+    let nes = Nes::new();
+    nes.processor_status_flag.set(4); // 3 == b100
+    instruction_cli(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 0);
+}
+
+fn instruction_clv(nes : &Nes)  {
+    nes.processor_status_flag.set(nes.processor_status_flag.get() & 0xdf);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_clv() {
+    let nes = Nes::new();
+    nes.processor_status_flag.set(32); // 3 == b100000
+    instruction_clv(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 0);
+}
+
+// Set flag opcodes (these also modify the processor status flag)
+fn instruction_sec(nes : &Nes)  {
+    nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_sec() {
+    let nes = Nes::new();
+    instruction_sec(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 1);
+}
+
+fn instruction_sed(nes : &Nes)  {
+    nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_sed() {
+    let nes = Nes::new();
+    instruction_sed(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 8);
+}
+
+fn instruction_sei(nes : &Nes)  {
+    nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b100);
+    let pc = nes.program_counter.get();
+    nes.program_counter.set((pc+1) as u16);
+}
+
+#[test]
+fn test_instruction_sei() {
+    let nes = Nes::new();
+    instruction_sei(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 4);
 }

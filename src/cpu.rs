@@ -59,6 +59,12 @@ impl CPU {
         opcodes.insert(0x78, instruction_sei);
         opcodes.insert(0x4c, instruction_jmp_absolute);
         opcodes.insert(0x6c, instruction_jmp_indirect);
+        opcodes.insert(0xe6, instruction_inc_zeropage);
+        opcodes.insert(0xf6, instruction_inc_zeropage_x);
+        opcodes.insert(0xee, instruction_inc_absolute);
+        opcodes.insert(0xfe, instruction_inc_absolute_x);
+        opcodes.insert(0xe8, instruction_inx);
+        opcodes.insert(0xc8, instruction_iny);
         CPU {opcodes: opcodes}
     }
 
@@ -1085,3 +1091,129 @@ fn test_instruction_jmp_indirect() {
     instruction_jmp_indirect(&nes);
     assert_eq!(nes.program_counter.get(), 2048);
 }
+
+// INC Opcodes
+
+fn instruction_inc_zeropage(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = memory[pc+1] as usize;
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    let value = (memory[operand] as u16) + 1;
+    memory[operand] = (value % 256) as u8;
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_inc_zeropage() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 255;
+    }
+    instruction_inc_zeropage(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[255], 1);
+}
+
+fn instruction_inc_zeropage_x(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = memory[pc+1] as usize;
+    let X = nes.X.get() as usize;
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    let value = (memory[(operand+X) % 256] as u16) + 1;
+    memory[(operand+X) % 256] = (value % 256) as u8;
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_inc_zeropage_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 254;
+    }
+    nes.X.set(1);
+    instruction_inc_zeropage_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[255], 1);
+}
+
+
+fn instruction_inc_absolute(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = (((memory[pc+2] as usize) << 8)) | (memory[pc+1] as usize);
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    let value = (memory[operand] as u16) + 1;
+    memory[operand] = (value % 256) as u8;
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_inc_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+    }
+    instruction_inc_absolute(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[2048], 1);
+}
+
+fn instruction_inc_absolute_x(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let operand = (((memory[pc+2] as usize) << 8)) | (memory[pc+1] as usize);
+    let X = nes.X.get() as usize;
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    let value = (memory[operand+X] as u16) + 1;
+    memory[operand+X] = (value % 256) as u8;
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_inc_absolute_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+    }
+    nes.X.set(1);
+    instruction_inc_absolute_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[2049], 1);
+}
+
+// INX and INY Opcodes
+
+fn instruction_inx(nes : &Nes) {
+    let X = nes.X.get() as u16;
+    update_processor_status_flag(X, &nes.processor_status_flag);
+    nes.X.set(((X+1) % 256) as u8);
+}
+
+#[test]
+fn test_instruction_inx() {
+    let nes = Nes::new();
+    instruction_inx(&nes);
+    assert_eq!(nes.X.get(),1);
+}
+
+fn instruction_iny(nes : &Nes) {
+    let Y = nes.Y.get() as u16;
+    update_processor_status_flag(Y, &nes.processor_status_flag);
+    nes.Y.set(((Y+1) % 256) as u8);
+}
+
+#[test]
+fn test_instruction_iny() {
+    let nes = Nes::new();
+    instruction_iny(&nes);
+    assert_eq!(nes.Y.get(),1);
+}
+
+
+

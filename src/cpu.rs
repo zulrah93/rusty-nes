@@ -65,6 +65,7 @@ impl CPU {
         opcodes.insert(0xfe, instruction_inc_absolute_x);
         opcodes.insert(0xe8, instruction_inx);
         opcodes.insert(0xc8, instruction_iny);
+        opcodes.insert(0x20, instruction_jsr);
         CPU {opcodes: opcodes}
     }
 
@@ -1215,5 +1216,34 @@ fn test_instruction_iny() {
     assert_eq!(nes.Y.get(),1);
 }
 
+//Call Opcode
+
+fn instruction_jsr(nes : &Nes) {
+    let pc = nes.program_counter.get();
+    let sp = (nes.stack_pointer.get() as usize) + 0x100;
+    let mut memory = nes.memory.borrow_mut();
+    memory[sp] = ((pc-1) & 0xff) as u8; // Push the two bytes of the current addres minus 1
+    memory[sp+1] = ((pc-1) >> 8 & 0xff) as u8;
+    nes.stack_pointer.set((sp+2) as u8);
+    let high_byte = memory[(pc as usize)+2] as u16; 
+    let target = (high_byte << 8) | (memory[(pc+1) as usize] as u16); // Get the 
+    nes.program_counter.set(target);
+}
+
+#[test]
+fn test_instruction_jsr() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[4] = 8;
+    }
+    nes.program_counter.set(2);
+    let sp = nes.stack_pointer.get();
+    instruction_jsr(&nes);
+    assert_eq!(nes.program_counter.get(), 2048);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0x100], 1);
+    assert_eq!(sp+2, nes.stack_pointer.get());
+}
 
 

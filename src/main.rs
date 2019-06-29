@@ -7,6 +7,7 @@ pub mod cpu;
 
 use ggez::ContextBuilder;
 use ggez::event::{self};
+use ggez::graphics::set_window_title;
 use nesfrontend::NesFrontend;
 
 fn main() {
@@ -18,6 +19,8 @@ fn main() {
         })
 		.build()
 		.expect("Failed to create context variable for NES frontend!");
+    //Set the window title.
+    set_window_title(context, "RustyNes");
 
     // Create an instance of your event handler.
     // Usually, you should provide it with the Context object to

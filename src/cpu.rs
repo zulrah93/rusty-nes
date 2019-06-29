@@ -57,6 +57,8 @@ impl CPU {
         opcodes.insert(0x38, instruction_sec);
         opcodes.insert(0xf8, instruction_sed);
         opcodes.insert(0x78, instruction_sei);
+        opcodes.insert(0x4c, instruction_jmp_absolute);
+        opcodes.insert(0x6c, instruction_jmp_indirect);
         CPU {opcodes: opcodes}
     }
 
@@ -1038,4 +1040,46 @@ fn test_instruction_sei() {
     let nes = Nes::new();
     instruction_sei(&nes);
     assert_eq!(nes.processor_status_flag.get(), 4);
+}
+
+fn instruction_jmp_absolute(nes : &Nes) {
+     let pc = nes.program_counter.get() as usize;
+     let memory = nes.memory.borrow();
+     let high_byte = memory[pc+2] as u16; 
+     let target = (high_byte << 8) | (memory[pc+1] as u16);
+     nes.program_counter.set(target);
+}
+
+#[test]
+fn test_instruction_jmp_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+    }
+    instruction_jmp_absolute(&nes);
+    assert_eq!(nes.program_counter.get(), 2048);
+}
+
+fn instruction_jmp_indirect(nes : &Nes) {
+     let pc = nes.program_counter.get() as usize;
+     let memory = nes.memory.borrow();
+     let high_byte = memory[pc+2] as usize; 
+     let address = (high_byte << 8) | (memory[pc+1] as usize);
+     let high_byte = memory[address+1] as u16;
+     println!("high_byte = {}", high_byte);
+     let target = (high_byte << 8) | (memory[address] as u16);
+     nes.program_counter.set(target);
+}
+
+#[test]
+fn test_instruction_jmp_indirect() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2049] = 8;
+    }
+    instruction_jmp_indirect(&nes);
+    assert_eq!(nes.program_counter.get(), 2048);
 }

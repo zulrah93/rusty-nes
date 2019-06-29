@@ -10,7 +10,7 @@ pub struct NesFrontend {
 impl NesFrontend {
     pub fn new() -> GameResult<NesFrontend> {
         if let Ok(bmp) = Bitmap::new(256, 240) {
-            bmp.fill_color((0, 0, 0, 255));
+            bmp.fill_color((0, 255, 0, 255));
             let nes_frontend = NesFrontend { bmp: bmp  };
             Ok(nes_frontend)
         }

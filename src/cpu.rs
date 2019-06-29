@@ -1042,6 +1042,8 @@ fn test_instruction_sei() {
     assert_eq!(nes.processor_status_flag.get(), 4);
 }
 
+//Jump Opcodes
+
 fn instruction_jmp_absolute(nes : &Nes) {
      let pc = nes.program_counter.get() as usize;
      let memory = nes.memory.borrow();

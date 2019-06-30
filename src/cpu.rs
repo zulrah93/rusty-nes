@@ -66,6 +66,12 @@ impl CPU {
         opcodes.insert(0xe8, instruction_inx);
         opcodes.insert(0xc8, instruction_iny);
         opcodes.insert(0x20, instruction_jsr);
+        opcodes.insert(0x60, instruction_rts);
+        opcodes.insert(0x69, instruction_adc_immediate);
+        opcodes.insert(0x65, instruction_adc_zeropage);
+        opcodes.insert(0x75, instruction_adc_zeropage_x);
+        opcodes.insert(0x6d, instruction_adc_absolute);
+        opcodes.insert(0x7d, instruction_adc_absolute_x);
         CPU {opcodes: opcodes}
     }
 
@@ -1246,4 +1252,257 @@ fn test_instruction_jsr() {
     assert_eq!(sp+2, nes.stack_pointer.get());
 }
 
+// Return opcode
 
+fn instruction_rts(nes : &Nes) {
+    let sp = (nes.stack_pointer.get()-2) as usize;
+    let memory = nes.memory.borrow();
+    let high_byte = memory[sp+0x101] as u16;
+    let return_address = (high_byte << 8) | (memory[sp+0x100] as u16);
+    nes.stack_pointer.set(sp as u8);
+    nes.program_counter.set(return_address);
+}
+
+#[test]
+fn test_instruction_rts() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[0x101] = 8;
+    }
+    nes.stack_pointer.set(2);
+    instruction_rts(&nes);
+    assert_eq!(nes.program_counter.get(), 2048);
+    assert_eq!(nes.stack_pointer.get(), 0);
+}
+
+// Add With Carry Opcodes
+fn instruction_adc_immediate(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let operand = memory[pc+1] as u16;
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    let A = nes.A.get() as u16;
+    let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
+        1
+    }
+    else {
+        0
+    };
+    let sum =  A + operand + carry;
+    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
+    }
+    if sum > 0xff { // Carry detected!
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+        nes.A.set(0xff);
+    }
+    else {
+        nes.A.set(sum as u8);
+    }
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_adc_immediate() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 64;
+        memory[3] = 128;
+    }
+    nes.A.set(64);
+    instruction_adc_immediate(&nes);
+    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
+    instruction_adc_immediate(&nes);
+    assert_eq!(nes.processor_status_flag.get() & 1, 1);
+}
+
+fn instruction_adc_zeropage(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let operand = memory[memory[pc+1] as usize] as u16;
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    let A = nes.A.get() as u16;
+    let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
+        1
+    }
+    else {
+        0
+    };
+    let sum =  A + operand + carry;
+    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
+    }
+    if sum > 0xff { // Carry detected!
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+        nes.A.set(0xff);
+    }
+    else {
+        nes.A.set(sum as u8);
+    }
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_adc_zeropage() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 64;
+        memory[64] = 64;
+        memory[3] = 128;
+        memory[128] = 182;
+    }
+    nes.A.set(64);
+    instruction_adc_zeropage(&nes);
+    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
+    instruction_adc_zeropage(&nes);
+    assert_eq!(nes.processor_status_flag.get() & 1, 1);
+}
+
+
+fn instruction_adc_zeropage_x(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let X = nes.X.get() as usize;
+    let address = ((memory[pc+1] as usize) + X) % 256;
+    let operand = memory[address] as u16;
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    let A = nes.A.get() as u16;
+    let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
+        1
+    }
+    else {
+        0
+    };
+    let sum =  A + operand + carry;
+    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
+    }
+    if sum > 0xff { // Carry detected!
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+        nes.A.set(0xff);
+    }
+    else {
+        nes.A.set(sum as u8);
+    }
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_adc_zeropage_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 63;
+        memory[64] = 64;
+        memory[3] = 127;
+        memory[128] = 128;
+    }
+    nes.A.set(64);
+    nes.X.set(1);
+    instruction_adc_zeropage_x(&nes);
+    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
+    instruction_adc_zeropage_x(&nes);
+    assert_eq!(nes.processor_status_flag.get() & 1, 1);
+}
+
+
+fn instruction_adc_absolute(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let high_byte = memory[pc+2] as usize;
+    let address =  (high_byte << 8) | (memory[pc+1] as usize);
+    let operand = memory[address] as u16;
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    let A = nes.A.get() as u16;
+    let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
+        1
+    }
+    else {
+        0
+    };
+    let sum =  A + operand + carry;
+    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
+    }
+    if sum > 0xff { // Carry detected!
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+        nes.A.set(0xff);
+    }
+    else {
+        nes.A.set(sum as u8);
+    }
+    nes.program_counter.set((pc+3) as u16);
+}
+
+#[test]
+fn test_instruction_adc_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2048] = 64;
+        memory[3] = 8;
+        memory[8] = 128;
+    }
+    nes.A.set(64);
+    instruction_adc_absolute(&nes);
+    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
+    instruction_adc_absolute(&nes);
+    assert_eq!(nes.processor_status_flag.get() & 1, 1);
+}
+
+
+fn instruction_adc_absolute_x(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let high_byte = memory[pc+2] as usize;
+    let X = nes.X.get() as usize;
+    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + X;
+    let operand = memory[address] as u16;
+    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
+    let A = nes.A.get() as u16;
+    let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
+        1
+    }
+    else {
+        0
+    };
+    let sum =  A + operand + carry;
+    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
+    }
+    if sum > 0xff { // Carry detected!
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+        nes.A.set(0xff);
+    }
+    else {
+        nes.A.set(sum as u8);
+    }
+    nes.program_counter.set((pc+3) as u16);
+}
+
+#[test]
+fn test_instruction_adc_absolute_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 254;
+        memory[255] = 64;
+        memory[3] = 8;
+        memory[8] = 128;
+    }
+    nes.A.set(64);
+    nes.X.set(1);
+    instruction_adc_absolute_x(&nes);
+    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
+    instruction_adc_absolute_x(&nes);
+    assert_eq!(nes.processor_status_flag.get() & 1, 1);
+}

@@ -81,7 +81,11 @@ impl CPU {
         opcodes.insert(0xfd, instruction_sbc_absolute_x);
         opcodes.insert(0xe1, instruction_sbc_index_indirect);
         opcodes.insert(0xf1, instruction_sbc_indirect_indexed);
-
+        opcodes.insert(0xea, instruction_nop);
+        opcodes.insert(0x48, instruction_pha);
+        opcodes.insert(0x08, instruction_php);
+        opcodes.insert(0x68, instruction_pla);
+        opcodes.insert(0x28, instruction_plp);
         CPU {opcodes: opcodes}
     }
 
@@ -1954,4 +1958,90 @@ fn test_instruction_sbc_indirect_indexed() {
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_indirect_indexed(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
+}
+
+// Nop Opcode
+fn instruction_nop(nes : &Nes) {
+    nes.program_counter.set(nes.program_counter.get()+1);
+}
+
+#[test]
+fn test_instruction_nop() {
+    let nes = Nes::new();
+    instruction_nop(&nes);
+    assert_eq!(nes.program_counter.get(), 1);
+}
+
+// Stack opcodes
+
+fn instruction_pha(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    memory[nes.stack_pointer.get() as usize + 0x100] = nes.A.get();
+    nes.stack_pointer.set(nes.stack_pointer.get()+1);
+    nes.program_counter.set(nes.program_counter.get()+1);
+}
+
+#[test]
+
+fn test_instruction_pha() {
+    let nes = Nes::new();
+    nes.A.set(69);
+    instruction_pha(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0x100], 69);
+}
+
+fn instruction_php(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    memory[nes.stack_pointer.get() as usize + 0x100] = nes.processor_status_flag.get();
+    nes.stack_pointer.set(nes.stack_pointer.get()+1);
+    nes.program_counter.set(nes.program_counter.get()+1);
+}
+
+#[test]
+fn test_instruction_php() {
+    let nes = Nes::new();
+    nes.processor_status_flag.set(69);
+    instruction_php(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0x100], 69);
+}
+
+fn instruction_pla(nes : &Nes) {
+    let memory = nes.memory.borrow_mut();
+    nes.A.set(memory[nes.stack_pointer.get() as usize + 0x100]);
+    update_processor_status_flag(nes.A.get() as u16, &nes.processor_status_flag);
+    nes.stack_pointer.set(nes.stack_pointer.get()-1);
+    nes.program_counter.set(nes.program_counter.get()+1);
+}
+
+#[test]
+fn test_instruction_pla() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[0x101] = 69;
+    }
+    nes.stack_pointer.set(1);
+    instruction_pla(&nes);
+    assert_eq!(nes.A.get(), 69);
+}
+
+fn instruction_plp(nes : &Nes) {
+    let memory = nes.memory.borrow();
+    nes.processor_status_flag.set(memory[nes.stack_pointer.get() as usize + 0x100]);
+    nes.stack_pointer.set(nes.stack_pointer.get()-1);
+    nes.program_counter.set(nes.program_counter.get()+1);
+}
+
+#[test]
+fn test_instruction_plp() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[0x101] = 69;
+    }
+    nes.stack_pointer.set(1);
+    instruction_plp(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 69);
 }

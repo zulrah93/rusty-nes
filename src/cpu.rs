@@ -118,6 +118,8 @@ impl CPU {
         opcodes.insert(0x70, instruction_bvs);
         opcodes.insert(0x0, instruction_brk);
         opcodes.insert(0x40, instruction_rti);
+        opcodes.insert(0x0a, instruction_asl_accumulator);
+        opcodes.insert(0x06, instruction_asl_zeropage);
         CPU {opcodes: opcodes}
     }
 
@@ -139,10 +141,10 @@ impl CPU {
 fn update_processor_status_flag(operand : u16, processor_status_flag : &Cell<u8>) {
     
         if operand == 0 { 
-            processor_status_flag.set(processor_status_flag.get() | 0x7d); // Set the zero flag bit which is the second bit.
+            processor_status_flag.set(processor_status_flag.get() | 2); // Set the zero flag bit which is the second bit.
         }
         else if operand >= 0x80 && operand <= 0xff { // If negative set negative flag bit which is the 7th bit.
-            processor_status_flag.set(processor_status_flag.get() | 0x40);
+            processor_status_flag.set(processor_status_flag.get() | 0x80);
         }
 }
 
@@ -150,14 +152,14 @@ fn update_processor_status_flag(operand : u16, processor_status_flag : &Cell<u8>
 fn test_update_processor_status_for_zero() {
     let nes = Nes::new();
     update_processor_status_flag(0, &nes.processor_status_flag);
-    assert_ne!(nes.processor_status_flag.get() & 0x7d, 0x0);
+    assert_ne!(nes.processor_status_flag.get() & 0x02, 0x0);
 }
 
 #[test]
 fn test_update_processor_status_for_negative() {
     let nes = Nes::new();
     update_processor_status_flag(0x80, &nes.processor_status_flag);
-    assert_ne!(nes.processor_status_flag.get() & 0x40, 0x0);
+    assert_ne!(nes.processor_status_flag.get() & 0x80, 0x0);
 }
 
 //LDa Opcodes
@@ -1340,7 +1342,7 @@ fn instruction_adc_immediate(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1382,7 +1384,7 @@ fn instruction_adc_zeropage(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1429,7 +1431,7 @@ fn instruction_adc_zeropage_x(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1477,7 +1479,7 @@ fn instruction_adc_absolute(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1492,13 +1494,12 @@ fn test_instruction_adc_absolute() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
         memory[2048] = 64;
-        memory[3] = 8;
+        memory[4] = 8;
         memory[8] = 128;
     }
     nes.a.set(64);
     instruction_adc_absolute(&nes);
     assert_eq!(nes.a.get(), 128);
-    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_adc_absolute(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
 }
@@ -1525,7 +1526,7 @@ fn instruction_adc_absolute_x(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1576,7 +1577,7 @@ fn instruction_adc_index_indirect(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1592,9 +1593,9 @@ fn test_instruction_adc_index_indirect() {
         memory[1] = 100;
         memory[101] = 64;
         memory[64] = 64;
-        memory[3] = 103;
+        memory[3] = 102;
         memory[103] = 128;
-        memory[129] = 128;
+        memory[128] = 128;
     }
     nes.a.set(64);
     nes.x.set(1);
@@ -1627,7 +1628,7 @@ fn instruction_adc_indirect_indexed(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1676,7 +1677,7 @@ fn instruction_sbc_immediate(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8)
     }
     else {
         nes.a.set(sum as u8);
@@ -1695,7 +1696,6 @@ fn test_instruction_sbc_immediate() {
     nes.a.set(64);
     instruction_sbc_immediate(&nes);
     assert_eq!(nes.a.get(), 0xff);
-    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_immediate(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
 }
@@ -1718,7 +1718,7 @@ fn instruction_sbc_zeropage(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1739,7 +1739,6 @@ fn test_instruction_sbc_zeropage() {
     nes.a.set(64);
     instruction_sbc_zeropage(&nes);
     assert_eq!(nes.a.get(), 0xff);
-    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_zeropage(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
 }
@@ -1765,7 +1764,7 @@ fn instruction_sbc_zeropage_x(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1787,7 +1786,6 @@ fn test_instruction_sbc_zeropage_x() {
     nes.x.set(1);
     instruction_sbc_zeropage_x(&nes);
     assert_eq!(nes.a.get(), 0xff);
-    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_zeropage_x(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
 }
@@ -1813,7 +1811,7 @@ fn instruction_sbc_absolute(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1828,13 +1826,13 @@ fn test_instruction_sbc_absolute() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
         memory[2048] = 64;
-        memory[3] = 8;
+        memory[4] = 8;
         memory[8] = 128;
     }
     nes.a.set(64);
     instruction_sbc_absolute(&nes);
     assert_eq!(nes.a.get(), 0xff);
-    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
+    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0);
     instruction_sbc_absolute(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
 }
@@ -1861,7 +1859,7 @@ fn instruction_sbc_absolute_x(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1883,7 +1881,6 @@ fn test_instruction_sbc_absolute_x() {
     nes.x.set(1);
     instruction_sbc_absolute_x(&nes);
     assert_eq!(nes.a.get(), 0xff);
-    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_absolute_x(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
 }
@@ -1911,7 +1908,7 @@ fn instruction_sbc_index_indirect(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1935,7 +1932,6 @@ fn test_instruction_sbc_index_indirect() {
     nes.x.set(1);
     instruction_sbc_index_indirect(&nes);
     assert_eq!(nes.a.get(), 0xff);
-    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_index_indirect(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
 }
@@ -1962,7 +1958,7 @@ fn instruction_sbc_indirect_indexed(nes : &Nes) {
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.a.set(0xff);
+        nes.a.set((sum & 0xff) as u8);
     }
     else {
         nes.a.set(sum as u8);
@@ -1987,7 +1983,6 @@ fn test_instruction_sbc_indirect_indexed() {
     nes.y.set(1);
     instruction_sbc_indirect_indexed(&nes);
     assert_eq!(nes.a.get(), 0xff);
-    assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_indirect_indexed(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
 }
@@ -2984,3 +2979,64 @@ fn test_instruction_rti() {
     assert_eq!(nes.processor_status_flag.get(), 8);
 }
 
+// Bit Shifting Opcodes
+
+fn instruction_asl_accumulator(nes : &Nes) {
+    let a = nes.a.get();
+    if (a & 0b10000000) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+    let result = a << 1;
+    update_processor_status_flag(result as u16, &nes.processor_status_flag);
+    nes.a.set(result);
+    nes.program_counter.set(nes.program_counter.get() + 1);
+}
+
+#[test]
+fn test_instruction_asl_accumulator() {
+    let nes = Nes::new();
+    nes.a.set(0x01);
+    instruction_asl_accumulator(&nes);
+    assert_eq!(nes.a.get(), 0x02);
+    nes.a.set(0xff);
+    instruction_asl_accumulator(&nes);
+    assert_eq!(nes.a.get(), 0xfe);
+    assert_eq!(nes.processor_status_flag.get(), 0x81);
+}
+
+
+fn instruction_asl_zeropage(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let zero_address = memory[pc+1] as usize;
+    let operand = memory[zero_address];
+    if (operand & 0b10000000) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+    let result = operand << 1;
+    if (result & 0b10000000) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    memory[zero_address] = result;
+    nes.program_counter.set((pc as u16) + 2);
+}
+
+#[test]
+fn test_instruction_asl_zeropage() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 0xfe;
+        memory[0xfe] = 1;
+        memory[3] = 0xff;
+        memory[0xff] = 0xff;  
+    }
+    instruction_asl_zeropage(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xfe], 0x02);
+    drop(memory);
+    instruction_asl_zeropage(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xff], 0xfe);
+    assert_eq!(nes.processor_status_flag.get(), 0x81);
+}

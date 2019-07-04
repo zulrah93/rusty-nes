@@ -17,6 +17,10 @@ before_script:
     - apt-get update
     - apt-get -y --no-install-recommends install build-essential -y libasound2-dev libudev-dev pkg-config
 
+#Variables
+variables:
+    RUSTFLAGS : "-D warnings"
+
 # Use cargo to test the project
 test:cargo:
   script:

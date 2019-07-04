@@ -107,6 +107,18 @@ impl CPU {
         opcodes.insert(0x1d, instruction_ora_absolute_x);
         opcodes.insert(0x01, instruction_ora_index_indirect);
         opcodes.insert(0x11, instruction_ora_indirect_indexed);
+        opcodes.insert(0x90, instruction_bcc);
+        opcodes.insert(0xb0, instruction_bcs);
+        opcodes.insert(0xf0, instruction_beq);
+        opcodes.insert(0x24, instruction_bit_zeropage);
+        opcodes.insert(0x2c, instruction_bit_absolute);
+        opcodes.insert(0x30, instruction_bmi);
+        opcodes.insert(0xd0, instruction_bne);
+        opcodes.insert(0x10, instruction_bpl);
+        opcodes.insert(0x50, instruction_bvc);
+        opcodes.insert(0x70, instruction_bvs);
+        opcodes.insert(0x0, instruction_brk);
+        opcodes.insert(0x40, instruction_rti);
         CPU {opcodes: opcodes}
     }
 
@@ -2653,4 +2665,323 @@ fn test_instruction_ora_indirect_indexed() {
     nes.Y.set(1);
     instruction_ora_indirect_indexed(&nes);
     assert_eq!(nes.A.get(), 64);
+}
+
+// Branch Opcodes
+
+fn instruction_bcc(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let offset = (pc + (memory[pc+1] as usize)) as u16;
+    let status = nes.processor_status_flag.get();
+    if (status & 1) == 0 {
+        nes.program_counter.set(offset);
+    }
+    else {
+        nes.program_counter.set((pc+2) as u16);
+    }
+}
+
+#[test]
+fn test_instruction_bcc() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    instruction_bcc(&nes);
+    assert_eq!(nes.program_counter.get(), 10);
+}
+
+fn instruction_bcs(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let offset = (pc + (memory[pc+1] as usize)) as u16;
+    let status = nes.processor_status_flag.get();
+    if (status & 1) == 1 {
+        nes.program_counter.set(offset);
+    }
+    else {
+        nes.program_counter.set((pc+2) as u16);
+    }
+}
+
+#[test]
+fn test_instruction_bcs() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    instruction_bcs(&nes);
+    assert_eq!(nes.program_counter.get(), 10);
+}
+
+
+fn instruction_beq(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let offset = (pc + (memory[pc+1] as usize)) as u16;
+    let status = nes.processor_status_flag.get();
+    if (status & 2) == 0 {
+        nes.program_counter.set(offset);
+    }
+    else {
+        nes.program_counter.set((pc+2) as u16);
+    }
+}
+
+#[test]
+fn test_instruction_beq() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    instruction_beq(&nes);
+    assert_eq!(nes.program_counter.get(), 10);
+}
+
+fn instruction_bit_zeropage(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let zero_address = memory[pc+1] as usize;
+    let operand = memory[zero_address];
+    let A = nes.A.get();
+    let result = A & operand;
+    update_processor_status_flag(result as u16, &nes.processor_status_flag);
+    nes.processor_status_flag.set(nes.processor_status_flag.get() | (operand & 0b11000000));
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_bit_zeropage() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+        memory[10] = 193;
+    }
+    instruction_bit_zeropage(&nes);
+    assert_ne!(nes.processor_status_flag.get() & 0b11000010, 0);
+}
+
+fn instruction_bit_absolute(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let lowbyte = memory[pc+1] as usize;
+    let high_byte = memory[pc+1] as usize;
+    let operand = memory[(high_byte << 8) | lowbyte];
+    let A = nes.A.get();
+    let result = A & operand;
+    update_processor_status_flag(result as u16, &nes.processor_status_flag);
+    nes.processor_status_flag.set(nes.processor_status_flag.get() | (operand & 0b11000000));
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_bit_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2048] = 193;
+    }
+    instruction_bit_absolute(&nes);
+    assert_ne!(nes.processor_status_flag.get() & 0b11000010, 0);
+}
+
+
+fn instruction_bmi(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let offset = (pc + (memory[pc+1] as usize)) as u16;
+    let status = nes.processor_status_flag.get();
+    if (status & 0b10000000) != 0 {
+        nes.program_counter.set(offset);
+    }
+    else {
+        nes.program_counter.set((pc+2) as u16);
+    }
+}
+
+#[test]
+fn test_instruction_bmi() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    instruction_bmi(&nes);
+    assert_eq!(nes.program_counter.get(), 10);
+}
+
+
+fn instruction_bne(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let offset = (pc + (memory[pc+1] as usize)) as u16;
+    let status = nes.processor_status_flag.get();
+    if (status & 2) != 0 {
+        nes.program_counter.set(offset);
+    }
+    else {
+        nes.program_counter.set((pc+2) as u16);
+    }
+}
+
+#[test]
+fn test_instruction_bne() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    nes.processor_status_flag.set(2);
+    instruction_bne(&nes);
+    assert_eq!(nes.program_counter.get(), 10);
+}
+
+
+fn instruction_bpl(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let offset = (pc + (memory[pc+1] as usize)) as u16;
+    let status = nes.processor_status_flag.get();
+    if (status & 0b10000000) == 0 {
+        nes.program_counter.set(offset);
+    }
+    else {
+        nes.program_counter.set((pc+2) as u16);
+    }
+}
+
+#[test]
+fn test_instruction_bpl() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    instruction_bpl(&nes);
+    assert_eq!(nes.program_counter.get(), 10);
+}
+
+fn instruction_bvc(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let offset = (pc + (memory[pc+1] as usize)) as u16;
+    let status = nes.processor_status_flag.get();
+    if (status & 0b01000000) == 0 {
+        nes.program_counter.set(offset);
+    }
+    else {
+        nes.program_counter.set((pc+2) as u16);
+    }
+}
+
+#[test]
+fn test_instruction_bvc() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    instruction_bvc(&nes);
+    assert_eq!(nes.program_counter.get(), 10);
+}
+
+
+fn instruction_bvs(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let offset = (pc + (memory[pc+1] as usize)) as u16;
+    let status = nes.processor_status_flag.get();
+    if (status & 0b01000000) != 0 {
+        nes.program_counter.set(offset);
+    }
+    else {
+        nes.program_counter.set((pc+2) as u16);
+    }
+}
+
+#[test]
+fn test_instruction_bvs() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 10;
+    }
+    nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b01000000);
+    instruction_bvs(&nes);
+    assert_eq!(nes.program_counter.get(), 10);
+}
+
+// IRQ Opcodes
+
+fn instruction_brk(nes : &Nes) {
+    let pc = nes.program_counter.get();
+    let stack_ptr = nes.stack_pointer.get() as usize;
+    if (nes.processor_status_flag.get() & 0b100) != 0 {
+        nes.program_counter.set(pc+1);
+        return;
+    }
+    nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000); // Set the break flag
+    let mut memory = nes.memory.borrow_mut();
+    memory[stack_ptr+0x100] = (pc & 0xff) as u8; // Stack starts in 0x100 in RAM
+    memory[stack_ptr+0x101] = ((pc & 0xff00) >> 8) as u8;
+    memory[stack_ptr+0x102] = nes.processor_status_flag.get();
+    nes.stack_pointer.set((stack_ptr+3) as u8);
+    let low_byte = memory[0xfffe] as u16; // Interrupt address is read starting at 0xfffe
+    let high_byte = memory[0xffff] as u16; 
+    let interrupt_address = (high_byte << 8) | low_byte;
+    nes.program_counter.set(interrupt_address);
+}
+
+#[test]
+fn test_instruction_brk() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[0xfffe] = 0x1; 
+    }
+    nes.program_counter.set(2048);
+    nes.processor_status_flag.set(8);
+    instruction_brk(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0x100], 0x0);
+    assert_eq!(memory[0x101], 0x8);
+    assert_eq!(memory[0x102], 0x8 | 0b10000);
+    assert_eq!(nes.program_counter.get(), 0x1);
+    assert_ne!(nes.processor_status_flag.get() & 0b10000, 0);
+    assert_eq!(nes.stack_pointer.get(), 0x3);
+}
+
+fn instruction_rti(nes : &Nes) {
+    let stack_pointer = nes.stack_pointer.get() as usize + 0x100;
+    let memory = nes.memory.borrow();
+    nes.processor_status_flag.set(memory[stack_pointer]);
+    let high_byte = memory[stack_pointer - 1] as u16;
+    let low_byte = memory[stack_pointer - 2] as u16;
+    let return_address = (high_byte << 8) | low_byte;
+    nes.stack_pointer.set(((stack_pointer - 0x100) - 3) as u8);
+    nes.program_counter.set(return_address); 
+}
+
+#[test]
+fn test_instruction_rti() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[0x103] = 8;
+        memory[0x102] = 8;
+    }
+    nes.stack_pointer.set(3);
+    instruction_rti(&nes);
+    assert_eq!(nes.program_counter.get(), 2048);
+    assert_eq!(nes.stack_pointer.get(), 0);
+    assert_eq!(nes.processor_status_flag.get(), 8);
+
 }

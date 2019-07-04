@@ -1,17 +1,16 @@
 use crate::nes::Nes;
 use std::cell::Cell;
-use std::ops::Index;
 use std::collections::HashMap;
 
-type opcode_callback = fn(&Nes);
+type OpcodeCallback = fn(&Nes);
 
 pub struct CPU {
-   opcodes : HashMap<u8,opcode_callback> // Opcode mapped to function that executes 
+   opcodes : HashMap<u8,OpcodeCallback> // Opcode mapped to function that executes 
 }
 
 impl CPU {
     pub fn new() -> Self {
-        let mut opcodes : HashMap<u8,opcode_callback> = HashMap::new();
+        let mut opcodes : HashMap<u8,OpcodeCallback> = HashMap::new();
         /*Instruction Implementations*/
         opcodes.insert(0xa9, instruction_lda_immediate);
         opcodes.insert(0xa5, instruction_lda_zero_page);
@@ -122,7 +121,7 @@ impl CPU {
         CPU {opcodes: opcodes}
     }
 
-    pub fn execute(&self, opcode : u8) -> Option<opcode_callback> {
+    pub fn execute(&self, opcode : u8) -> Option<OpcodeCallback> {
         if self.opcodes.contains_key(&opcode) {
             if let Some(callback) = self.opcodes.get(&opcode) {
                 Some(*callback)
@@ -161,13 +160,13 @@ fn test_update_processor_status_for_negative() {
     assert_ne!(nes.processor_status_flag.get() & 0x40, 0x0);
 }
 
-//LDA Opcodes
+//LDa Opcodes
 fn instruction_lda_immediate(nes : &Nes) {
    let memory =  nes.memory.borrow();
    let pc = nes.program_counter.get() as usize;
    let operand = memory[pc+1] as u16;
    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-   nes.A.set(operand as u8);
+   nes.a.set(operand as u8);
    nes.program_counter.set(((pc+2) as u16) as u16);
 }
 
@@ -180,7 +179,7 @@ fn test_instruction_lda_immediate() {
     }
     nes.program_counter.set(0);
     instruction_lda_immediate(&nes);
-    assert_eq!(nes.A.get(), 69);
+    assert_eq!(nes.a.get(), 69);
 }
 
 fn instruction_lda_zero_page(nes : &Nes) {
@@ -188,7 +187,7 @@ fn instruction_lda_zero_page(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.A.set(memory[operand as usize]);
+    nes.a.set(memory[operand as usize]);
     nes.program_counter.set((pc+2) as u16);
 }
 
@@ -202,16 +201,16 @@ fn test_instruction_lda_zero_page() {
     }
     nes.program_counter.set(0);
     instruction_lda_zero_page(&nes);
-    assert_eq!(nes.A.get(), 69);
+    assert_eq!(nes.a.get(), 69);
 }
 
 fn instruction_lda_zero_page_x(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16;
-    let X = nes.X.get() as u16;
+    let x = nes.x.get() as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.A.set(memory[((operand+X) % 256) as usize]);
+    nes.a.set(memory[((operand+x) % 256) as usize]);
     nes.program_counter.set((pc+2) as u16);
 }
 
@@ -222,11 +221,11 @@ fn test_instruction_lda_zero_page_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 100;
         memory[101] = 69;
-        nes.X.set(1);
+        nes.x.set(1);
     }
     nes.program_counter.set(0);
     instruction_lda_zero_page_x(&nes);
-    assert_eq!(nes.A.get(), 69);
+    assert_eq!(nes.a.get(), 69);
 }
 
 fn instruction_lda_absolute(nes : &Nes) {
@@ -234,7 +233,7 @@ fn instruction_lda_absolute(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.A.set(memory[operand as usize]);
+    nes.a.set(memory[operand as usize]);
     nes.program_counter.set((pc+3) as u16);
 }
 
@@ -248,16 +247,16 @@ fn test_instruction_lda_absolute() {
     }
     nes.program_counter.set(0);
     instruction_lda_absolute(&nes);
-    assert_eq!(nes.A.get(), 69);
+    assert_eq!(nes.a.get(), 69);
 }
 
 fn instruction_lda_absolute_x(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
-    let X = nes.X.get() as u16;
+    let x = nes.x.get() as u16;
     let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.A.set(memory[(operand + X) as usize]);
+    nes.a.set(memory[(operand + x) as usize]);
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -268,20 +267,20 @@ fn test_instruction_lda_absolute_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
         memory[2048+255] = 69;
-        nes.X.set(255);
+        nes.x.set(255);
     }
     nes.program_counter.set(0);
     instruction_lda_absolute_x(&nes);
-    assert_eq!(nes.A.get(), 69);
+    assert_eq!(nes.a.get(), 69);
 }
 
 fn instruction_lda_absolute_y(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
-    let Y = nes.Y.get() as u16;
+    let y = nes.y.get() as u16;
     let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.A.set(memory[(operand + Y) as usize]);
+    nes.a.set(memory[(operand + y) as usize]);
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -292,21 +291,21 @@ fn test_instruction_lda_absolute_y() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
         memory[2048+255] = 69;
-        nes.Y.set(255);
+        nes.y.set(255);
     }
     nes.program_counter.set(0);
     instruction_lda_absolute_y(&nes);
-    assert_eq!(nes.A.get(), 69);
+    assert_eq!(nes.a.get(), 69);
 }
 
 fn instruction_lda_indirect_x(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
-    let X = nes.X.get() as u16;
+    let x = nes.x.get() as u16;
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let address = ((operand + X) % 256) as usize;
-    nes.A.set(memory[((memory[address+1] as usize) << 8) | (memory[address] as usize)] as u8);
+    let address = ((operand + x) % 256) as usize;
+    nes.a.set(memory[((memory[address+1] as usize) << 8) | (memory[address] as usize)] as u8);
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -318,21 +317,21 @@ fn test_instruction_lda_indirect_x() {
         memory[1] = 1;
         memory[256] = 8;
         memory[2048] = 69;
-        nes.X.set(254);
+        nes.x.set(254);
     }
     nes.program_counter.set(0);
     instruction_lda_indirect_x(&nes);
-    assert_eq!(nes.A.get(), 69);
+    assert_eq!(nes.a.get(), 69);
 }
 
 fn instruction_lda_indirect_indexed(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
-    let Y = nes.Y.get() as usize;
+    let y = nes.y.get() as usize;
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
     let address = ((memory[(operand+1) as usize] as usize) << 8) | (memory[operand as usize] as usize); 
-    nes.A.set(memory[(address + Y) as usize] as u8);
+    nes.a.set(memory[(address + y) as usize] as u8);
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -344,11 +343,11 @@ fn test_instruction_lda_indirect_indexed() {
         memory[1] = 253;
         memory[254] = 8;
         memory[2048+254] = 69;
-        nes.Y.set(254);
+        nes.y.set(254);
     }
     nes.program_counter.set(0);
     instruction_lda_indirect_indexed(&nes);
-    assert_eq!(nes.A.get(), 69);
+    assert_eq!(nes.a.get(), 69);
 }
 
 // LDY Opcodes
@@ -357,7 +356,7 @@ fn instruction_ldy_immediate(nes : &Nes) {
    let pc = nes.program_counter.get() as usize;
    let operand = memory[pc+1] as u16;
    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-   nes.Y.set(operand as u8);
+   nes.y.set(operand as u8);
    nes.program_counter.set(((pc+2) as u16) as u16);
 }
 
@@ -370,7 +369,7 @@ fn test_instruction_ldy_immediate() {
     }
     nes.program_counter.set(0);
     instruction_ldy_immediate(&nes);
-    assert_eq!(nes.Y.get(), 69);
+    assert_eq!(nes.y.get(), 69);
 }
 
 fn instruction_ldy_zero_page(nes : &Nes) {
@@ -378,7 +377,7 @@ fn instruction_ldy_zero_page(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.Y.set(memory[operand as usize]);
+    nes.y.set(memory[operand as usize]);
     nes.program_counter.set((pc+2) as u16);
 }
 
@@ -392,16 +391,16 @@ fn test_instruction_ldy_zero_page() {
     }
     nes.program_counter.set(0);
     instruction_ldy_zero_page(&nes);
-    assert_eq!(nes.Y.get(), 69);
+    assert_eq!(nes.y.get(), 69);
 }
 
 fn instruction_ldy_zero_page_x(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16;
-    let X = nes.X.get() as u16;
+    let x = nes.x.get() as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.Y.set(memory[((operand+X) % 256) as usize]);
+    nes.y.set(memory[((operand+x) % 256) as usize]);
     nes.program_counter.set((pc+2) as u16);
 }
 
@@ -412,11 +411,11 @@ fn test_instruction_ldy_zero_page_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 100;
         memory[101] = 69;
-        nes.X.set(1);
+        nes.x.set(1);
     }
     nes.program_counter.set(0);
     instruction_ldy_zero_page_x(&nes);
-    assert_eq!(nes.Y.get(), 69);
+    assert_eq!(nes.y.get(), 69);
 }
 
 fn instruction_ldy_absolute(nes : &Nes) {
@@ -424,7 +423,7 @@ fn instruction_ldy_absolute(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.Y.set(memory[operand as usize]);
+    nes.y.set(memory[operand as usize]);
     nes.program_counter.set((pc+3) as u16);
 }
 
@@ -438,16 +437,16 @@ fn test_instruction_ldy_absolute() {
     }
     nes.program_counter.set(0);
     instruction_ldy_absolute(&nes);
-    assert_eq!(nes.Y.get(), 69);
+    assert_eq!(nes.y.get(), 69);
 }
 
 fn instruction_ldy_absolute_x(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
-    let X = nes.X.get() as u16;
+    let x = nes.x.get() as u16;
     let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.Y.set(memory[(operand + X) as usize]);
+    nes.y.set(memory[(operand + x) as usize]);
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -458,11 +457,11 @@ fn test_instruction_ldy_absolute_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
         memory[2048+255] = 69;
-        nes.X.set(255);
+        nes.x.set(255);
     }
     nes.program_counter.set(0);
     instruction_ldy_absolute_x(&nes);
-    assert_eq!(nes.Y.get(), 69);
+    assert_eq!(nes.y.get(), 69);
 }
 
 // LDX Opcodes
@@ -471,7 +470,7 @@ fn instruction_ldx_immediate(nes : &Nes) {
    let pc = nes.program_counter.get() as usize;
    let operand = memory[pc+1] as u16;
    update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-   nes.X.set(operand as u8);
+   nes.x.set(operand as u8);
    nes.program_counter.set(((pc+2) as u16) as u16);
 }
 
@@ -484,7 +483,7 @@ fn test_instruction_ldx_immediate() {
     }
     nes.program_counter.set(0);
     instruction_ldx_immediate(&nes);
-    assert_eq!(nes.X.get(), 69);
+    assert_eq!(nes.x.get(), 69);
 }
 
 fn instruction_ldx_zero_page(nes : &Nes) {
@@ -492,7 +491,7 @@ fn instruction_ldx_zero_page(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.X.set(memory[operand as usize]);
+    nes.x.set(memory[operand as usize]);
     nes.program_counter.set((pc+2) as u16);
 }
 
@@ -506,16 +505,16 @@ fn test_instruction_ldx_zero_page() {
     }
     nes.program_counter.set(0);
     instruction_ldx_zero_page(&nes);
-    assert_eq!(nes.X.get(), 69);
+    assert_eq!(nes.x.get(), 69);
 }
 
 fn instruction_ldx_zero_page_x(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16;
-    let X = nes.X.get() as u16;
+    let x = nes.x.get() as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.X.set(memory[((operand+X) % 256) as usize]);
+    nes.x.set(memory[((operand+x) % 256) as usize]);
     nes.program_counter.set((pc+2) as u16);
 }
 
@@ -526,11 +525,11 @@ fn test_instruction_ldx_zero_page_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 100;
         memory[101] = 69;
-        nes.X.set(1);
+        nes.x.set(1);
     }
     nes.program_counter.set(0);
     instruction_ldx_zero_page_x(&nes);
-    assert_eq!(nes.X.get(), 69);
+    assert_eq!(nes.x.get(), 69);
 }
 
 fn instruction_ldx_absolute(nes : &Nes) {
@@ -538,7 +537,7 @@ fn instruction_ldx_absolute(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.X.set(memory[operand as usize]);
+    nes.x.set(memory[operand as usize]);
     nes.program_counter.set((pc+3) as u16);
 }
 
@@ -552,16 +551,16 @@ fn test_instruction_ldx_absolute() {
     }
     nes.program_counter.set(0);
     instruction_ldx_absolute(&nes);
-    assert_eq!(nes.X.get(), 69);
+    assert_eq!(nes.x.get(), 69);
 }
 
 fn instruction_ldx_absolute_x(nes : &Nes) {
     let memory =  nes.memory.borrow();
     let pc = nes.program_counter.get() as usize;
-    let X = nes.X.get() as u16;
+    let x = nes.x.get() as u16;
     let operand : u16 = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16); // Convert the two bytes into a 16-bit unsigned integer
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    nes.X.set(memory[(operand + X) as usize]);
+    nes.x.set(memory[(operand + x) as usize]);
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -572,20 +571,20 @@ fn test_instruction_ldx_absolute_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
         memory[2048+255] = 69;
-        nes.X.set(255);
+        nes.x.set(255);
     }
     nes.program_counter.set(0);
     instruction_ldx_absolute_x(&nes);
-    assert_eq!(nes.X.get(), 69);
+    assert_eq!(nes.x.get(), 69);
 }
 
-//STA Opcodes
+//STa Opcodes
 fn instruction_sta_zero_page(nes : &Nes) {
     let mut memory = nes.memory.borrow_mut();
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16; 
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    memory[operand as usize] = nes.A.get();
+    memory[operand as usize] = nes.a.get();
     nes.program_counter.set(((pc+2) as u16) as u16);
 }
 
@@ -596,7 +595,7 @@ fn test_instruction_sta_zero_page() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 0xff;
     }
-    nes.A.set(69); 
+    nes.a.set(69); 
     instruction_sta_zero_page(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[0xff], 69);
@@ -606,9 +605,9 @@ fn instruction_sta_zero_page_x(nes : &Nes) {
     let mut memory = nes.memory.borrow_mut();
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16;
-    let X = nes.X.get() as u16; 
+    let x = nes.x.get() as u16; 
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    memory[((operand + X) % 256) as usize] = nes.A.get();
+    memory[((operand + x) % 256) as usize] = nes.a.get();
     nes.program_counter.set(((pc+2) as u16) as u16);
 }
 
@@ -619,8 +618,8 @@ fn test_instruction_sta_zero_page_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 10;
     }
-    nes.A.set(69); 
-    nes.X.set(10);
+    nes.a.set(69); 
+    nes.x.set(10);
     instruction_sta_zero_page_x(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[20], 69);
@@ -631,7 +630,7 @@ fn instruction_sta_absolute(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16);
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    memory[operand as usize] = nes.A.get();
+    memory[operand as usize] = nes.a.get();
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -642,7 +641,7 @@ fn test_instruction_sta_absolute() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
     }
-    nes.A.set(69); 
+    nes.a.set(69); 
     instruction_sta_absolute(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[2048], 69);
@@ -653,8 +652,8 @@ fn instruction_sta_absolute_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16);
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let X = nes.X.get() as usize;
-    memory[(operand as usize) + X] = nes.A.get();
+    let x = nes.x.get() as usize;
+    memory[(operand as usize) + x] = nes.a.get();
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -665,8 +664,8 @@ fn test_instruction_sta_absolute_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
     }
-    nes.A.set(69);
-    nes.X.set(10); 
+    nes.a.set(69);
+    nes.x.set(10); 
     instruction_sta_absolute_x(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[2058], 69);
@@ -677,8 +676,8 @@ fn instruction_sta_absolute_y(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16);
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let Y = nes.Y.get() as usize;
-    memory[(operand as usize) + Y] = nes.A.get();
+    let y = nes.y.get() as usize;
+    memory[(operand as usize) + y] = nes.a.get();
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -689,8 +688,8 @@ fn test_instruction_sta_absolute_y() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
     }
-    nes.A.set(69);
-    nes.Y.set(10); 
+    nes.a.set(69);
+    nes.y.set(10); 
     instruction_sta_absolute_y(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[2058], 69);
@@ -700,14 +699,14 @@ fn test_instruction_sta_absolute_y() {
 fn instruction_sta_indirect_x(nes : &Nes) {
     let mut memory =  nes.memory.borrow_mut();
     let pc = nes.program_counter.get() as usize;
-    let X = nes.X.get() as u16;
+    let x = nes.x.get() as u16;
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let address = ((operand + X) % 256) as usize;
+    let address = ((operand + x) % 256) as usize;
     let upper = memory[address+1] as usize;
     let lower = memory[address] as usize;
     let indirect_address = (upper << 8) | lower;
-    memory[indirect_address] = nes.A.get();
+    memory[indirect_address] = nes.a.get();
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -718,9 +717,9 @@ fn test_instruction_sta_indirect_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 1;
         memory[256] = 8;
-        nes.X.set(254);
+        nes.x.set(254);
     }
-    nes.A.set(69);
+    nes.a.set(69);
     instruction_sta_indirect_x(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[2048], 69);
@@ -729,11 +728,11 @@ fn test_instruction_sta_indirect_x() {
 fn instruction_sta_indirect_indexed(nes : &Nes) {
     let mut memory =  nes.memory.borrow_mut();
     let pc = nes.program_counter.get() as usize;
-    let Y = nes.Y.get() as usize;
+    let y = nes.y.get() as usize;
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let address = (((memory[(operand+1) as usize] as usize) << 8) | (memory[operand as usize] as usize)) + Y; 
-    memory[address] = nes.A.get() as u8;
+    let address = (((memory[(operand+1) as usize] as usize) << 8) | (memory[operand as usize] as usize)) + y; 
+    memory[address] = nes.a.get() as u8;
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -744,9 +743,9 @@ fn test_instruction_sta_indirect_indexed() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 253;
         memory[254] = 8;
-        nes.Y.set(254);
+        nes.y.set(254);
     }
-    nes.A.set(69);
+    nes.a.set(69);
     instruction_sta_indirect_indexed(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[2048+254], 69);
@@ -758,7 +757,7 @@ fn instruction_stx_zero_page(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16; 
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    memory[operand as usize] = nes.X.get();
+    memory[operand as usize] = nes.x.get();
     nes.program_counter.set(((pc+2) as u16) as u16);
 }
 
@@ -769,7 +768,7 @@ fn test_instruction_stx_zero_page() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 0xff;
     }
-    nes.X.set(69); 
+    nes.x.set(69); 
     instruction_stx_zero_page(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[0xff], 69);
@@ -780,7 +779,7 @@ fn instruction_stx_absolute(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16);
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    memory[operand as usize] = nes.X.get();
+    memory[operand as usize] = nes.x.get();
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -791,7 +790,7 @@ fn test_instruction_stx_absolute() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
     }
-    nes.X.set(69); 
+    nes.x.set(69); 
     instruction_stx_absolute(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[2048], 69);
@@ -802,9 +801,9 @@ fn instruction_stx_zero_page_y(nes : &Nes) {
     let mut memory = nes.memory.borrow_mut();
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16;
-    let Y = nes.Y.get() as u16; 
+    let y = nes.y.get() as u16; 
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    memory[((operand + Y) % 256) as usize] = nes.X.get();
+    memory[((operand + y) % 256) as usize] = nes.x.get();
     nes.program_counter.set(((pc+2) as u16) as u16);
 }
 
@@ -815,8 +814,8 @@ fn test_instruction_stx_zero_page_y() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 10;
     }
-    nes.X.set(69); 
-    nes.Y.set(10);
+    nes.x.set(69); 
+    nes.y.set(10);
     instruction_stx_zero_page_y(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[20], 69);
@@ -828,7 +827,7 @@ fn instruction_sty_zero_page(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16; 
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    memory[operand as usize] = nes.Y.get();
+    memory[operand as usize] = nes.y.get();
     nes.program_counter.set(((pc+2) as u16) as u16);
 }
 
@@ -839,7 +838,7 @@ fn test_instruction_sty_zero_page() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 0xff;
     }
-    nes.Y.set(69); 
+    nes.y.set(69); 
     instruction_sty_zero_page(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[0xff], 69);
@@ -850,7 +849,7 @@ fn instruction_sty_absolute(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let operand = ((memory[pc+2] as u16) << 8) | (memory[pc+1] as u16);
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    memory[operand as usize] = nes.Y.get();
+    memory[operand as usize] = nes.y.get();
     nes.program_counter.set(((pc+3) as u16) as u16);
 }
 
@@ -861,7 +860,7 @@ fn test_instruction_sty_absolute() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
     }
-    nes.Y.set(69); 
+    nes.y.set(69); 
     instruction_sty_absolute(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[2048], 69);
@@ -872,9 +871,9 @@ fn instruction_sty_zero_page_x(nes : &Nes) {
     let mut memory = nes.memory.borrow_mut();
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as u16;
-    let X = nes.X.get() as u16; 
+    let x = nes.x.get() as u16; 
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    memory[((operand + X) % 256) as usize] = nes.Y.get();
+    memory[((operand + x) % 256) as usize] = nes.y.get();
     nes.program_counter.set(((pc+2) as u16) as u16);
 }
 
@@ -885,8 +884,8 @@ fn test_instruction_sty_zero_page_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 10;
     }
-    nes.Y.set(69); 
-    nes.X.set(10);
+    nes.y.set(69); 
+    nes.x.set(10);
     instruction_sty_zero_page_x(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[20], 69);
@@ -895,9 +894,9 @@ fn test_instruction_sty_zero_page_x() {
 // TAX opcode
 
 fn instruction_tax(nes : &Nes) {
-    let A = nes.A.get();
-    update_processor_status_flag(A as u16, &nes.processor_status_flag);
-    nes.X.set(A);
+    let a = nes.a.get();
+    update_processor_status_flag(a as u16, &nes.processor_status_flag);
+    nes.x.set(a);
     let pc = nes.program_counter.get();
     nes.program_counter.set((pc+1) as u16);
 }
@@ -905,18 +904,18 @@ fn instruction_tax(nes : &Nes) {
 #[test]
 fn test_instruction_tax() {
      let nes = Nes::new();
-     nes.A.set(69);
+     nes.a.set(69);
      instruction_tax(&nes);
-     assert_eq!(nes.X.get(), 69);
+     assert_eq!(nes.x.get(), 69);
 }
 
 
 // TAY opcode
 
 fn instruction_tay(nes : &Nes) {
-    let A = nes.A.get();
-    update_processor_status_flag(A as u16, &nes.processor_status_flag);
-    nes.Y.set(A);
+    let a = nes.a.get();
+    update_processor_status_flag(a as u16, &nes.processor_status_flag);
+    nes.y.set(a);
     let pc = nes.program_counter.get();
     nes.program_counter.set((pc+1) as u16);
 }
@@ -924,9 +923,9 @@ fn instruction_tay(nes : &Nes) {
 #[test]
 fn test_instruction_tay() {
      let nes = Nes::new();
-     nes.A.set(69);
+     nes.a.set(69);
      instruction_tay(&nes);
-     assert_eq!(nes.Y.get(), 69);
+     assert_eq!(nes.y.get(), 69);
 }
 
 //TSX Opcode
@@ -934,7 +933,7 @@ fn test_instruction_tay() {
 fn instruction_tsx(nes : &Nes) {
     let stack_ptr = nes.stack_pointer.get();
     update_processor_status_flag(stack_ptr as u16, &nes.processor_status_flag);
-    nes.X.set(stack_ptr);
+    nes.x.set(stack_ptr);
     let pc = nes.program_counter.get();
     nes.program_counter.set((pc+1) as u16);
 }
@@ -944,16 +943,16 @@ fn test_instruction_tsx() {
      let nes = Nes::new();
      nes.stack_pointer.set(69);
      instruction_tsx(&nes);
-     assert_eq!(nes.X.get(), 69);
+     assert_eq!(nes.x.get(), 69);
 }
 
 
-// TXA opcode
+// TXa opcode
 
 fn instruction_txa(nes : &Nes) {
-    let X = nes.X.get();
-    update_processor_status_flag(X as u16, &nes.processor_status_flag);
-    nes.A.set(X);
+    let x = nes.x.get();
+    update_processor_status_flag(x as u16, &nes.processor_status_flag);
+    nes.a.set(x);
     let pc = nes.program_counter.get();
     nes.program_counter.set((pc+1) as u16);
 }
@@ -961,18 +960,18 @@ fn instruction_txa(nes : &Nes) {
 #[test]
 fn test_instruction_txa() {
      let nes = Nes::new();
-     nes.X.set(69);
+     nes.x.set(69);
      instruction_txa(&nes);
-     assert_eq!(nes.A.get(), 69);
+     assert_eq!(nes.a.get(), 69);
 }
 
 
 // TXS opcode
 
 fn instruction_txs(nes : &Nes) {
-    let X = nes.X.get();
-    update_processor_status_flag(X as u16, &nes.processor_status_flag);
-    nes.stack_pointer.set(X);
+    let x = nes.x.get();
+    update_processor_status_flag(x as u16, &nes.processor_status_flag);
+    nes.stack_pointer.set(x);
     let pc = nes.program_counter.get();
     nes.program_counter.set((pc+1) as u16);
 }
@@ -980,18 +979,18 @@ fn instruction_txs(nes : &Nes) {
 #[test]
 fn test_instruction_txs() {
      let nes = Nes::new();
-     nes.X.set(69);
+     nes.x.set(69);
      instruction_txs(&nes);
      assert_eq!(nes.stack_pointer.get(), 69);
 }
 
 
-// TYA opcode
+// TYa opcode
 
 fn instruction_tya(nes : &Nes) {
-    let Y = nes.Y.get();
-    update_processor_status_flag(Y as u16, &nes.processor_status_flag);
-    nes.A.set(Y);
+    let y = nes.y.get();
+    update_processor_status_flag(y as u16, &nes.processor_status_flag);
+    nes.a.set(y);
     let pc = nes.program_counter.get();
     nes.program_counter.set((pc+1) as u16);
 }
@@ -999,9 +998,9 @@ fn instruction_tya(nes : &Nes) {
 #[test]
 fn test_instruction_tya() {
      let nes = Nes::new();
-     nes.Y.set(69);
+     nes.y.set(69);
      instruction_tya(&nes);
-     assert_eq!(nes.A.get(), 69);
+     assert_eq!(nes.a.get(), 69);
 }
 
 //Clear opcodes (these modify the processor status flag)
@@ -1173,10 +1172,10 @@ fn instruction_inc_zeropage_x(nes : &Nes) {
     let mut memory = nes.memory.borrow_mut();
     let pc = nes.program_counter.get() as usize;
     let operand = memory[pc+1] as usize;
-    let X = nes.X.get() as usize;
+    let x = nes.x.get() as usize;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let value = (memory[(operand+X) % 256] as u16) + 1;
-    memory[(operand+X) % 256] = (value % 256) as u8;
+    let value = (memory[(operand+x) % 256] as u16) + 1;
+    memory[(operand+x) % 256] = (value % 256) as u8;
     nes.program_counter.set((pc+2) as u16);
 }
 
@@ -1187,7 +1186,7 @@ fn test_instruction_inc_zeropage_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 254;
     }
-    nes.X.set(1);
+    nes.x.set(1);
     instruction_inc_zeropage_x(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[255], 1);
@@ -1220,10 +1219,10 @@ fn instruction_inc_absolute_x(nes : &Nes) {
     let mut memory = nes.memory.borrow_mut();
     let pc = nes.program_counter.get() as usize;
     let operand = (((memory[pc+2] as usize) << 8)) | (memory[pc+1] as usize);
-    let X = nes.X.get() as usize;
+    let x = nes.x.get() as usize;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let value = (memory[operand+X] as u16) + 1;
-    memory[operand+X] = (value % 256) as u8;
+    let value = (memory[operand+x] as u16) + 1;
+    memory[operand+x] = (value % 256) as u8;
     nes.program_counter.set((pc+2) as u16);
 }
 
@@ -1234,7 +1233,7 @@ fn test_instruction_inc_absolute_x() {
         let mut memory = nes.memory.borrow_mut();
         memory[2] = 8;
     }
-    nes.X.set(1);
+    nes.x.set(1);
     instruction_inc_absolute_x(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[2049], 1);
@@ -1243,29 +1242,29 @@ fn test_instruction_inc_absolute_x() {
 // INX and INY Opcodes
 
 fn instruction_inx(nes : &Nes) {
-    let X = nes.X.get() as u16;
-    update_processor_status_flag(X, &nes.processor_status_flag);
-    nes.X.set(((X+1) % 256) as u8);
+    let x = nes.x.get() as u16;
+    update_processor_status_flag(x, &nes.processor_status_flag);
+    nes.x.set(((x+1) % 256) as u8);
 }
 
 #[test]
 fn test_instruction_inx() {
     let nes = Nes::new();
     instruction_inx(&nes);
-    assert_eq!(nes.X.get(),1);
+    assert_eq!(nes.x.get(),1);
 }
 
 fn instruction_iny(nes : &Nes) {
-    let Y = nes.Y.get() as u16;
-    update_processor_status_flag(Y, &nes.processor_status_flag);
-    nes.Y.set(((Y+1) % 256) as u8);
+    let y = nes.y.get() as u16;
+    update_processor_status_flag(y, &nes.processor_status_flag);
+    nes.y.set(((y+1) % 256) as u8);
 }
 
 #[test]
 fn test_instruction_iny() {
     let nes = Nes::new();
     instruction_iny(&nes);
-    assert_eq!(nes.Y.get(),1);
+    assert_eq!(nes.y.get(),1);
 }
 
 //Call Opcode
@@ -1328,23 +1327,23 @@ fn instruction_adc_immediate(nes : &Nes) {
     let memory = nes.memory.borrow();
     let operand = memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1357,9 +1356,9 @@ fn test_instruction_adc_immediate() {
         memory[1] = 64;
         memory[3] = 128;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_adc_immediate(&nes);
-    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.a.get(), 128);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_adc_immediate(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1370,23 +1369,23 @@ fn instruction_adc_zeropage(nes : &Nes) {
     let memory = nes.memory.borrow();
     let operand = memory[memory[pc+1] as usize] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1401,9 +1400,9 @@ fn test_instruction_adc_zeropage() {
         memory[3] = 128;
         memory[128] = 182;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_adc_zeropage(&nes);
-    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.a.get(), 128);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_adc_zeropage(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1413,27 +1412,27 @@ fn test_instruction_adc_zeropage() {
 fn instruction_adc_zeropage_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
-    let address = ((memory[pc+1] as usize) + X) % 256;
+    let x = nes.x.get() as usize;
+    let address = ((memory[pc+1] as usize) + x) % 256;
     let operand = memory[address] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1448,10 +1447,10 @@ fn test_instruction_adc_zeropage_x() {
         memory[3] = 127;
         memory[128] = 128;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_adc_zeropage_x(&nes);
-    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.a.get(), 128);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_adc_zeropage_x(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1465,23 +1464,23 @@ fn instruction_adc_absolute(nes : &Nes) {
     let address =  (high_byte << 8) | (memory[pc+1] as usize);
     let operand = memory[address] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+3) as u16);
 }
@@ -1496,9 +1495,9 @@ fn test_instruction_adc_absolute() {
         memory[3] = 8;
         memory[8] = 128;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_adc_absolute(&nes);
-    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.a.get(), 128);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_adc_absolute(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1509,27 +1508,27 @@ fn instruction_adc_absolute_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
     let high_byte = memory[pc+2] as usize;
-    let X = nes.X.get() as usize;
-    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + X;
+    let x = nes.x.get() as usize;
+    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + x;
     let operand = memory[address] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+3) as u16);
 }
@@ -1544,10 +1543,10 @@ fn test_instruction_adc_absolute_x() {
         memory[3] = 8;
         memory[8] = 128;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_adc_absolute_x(&nes);
-    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.a.get(), 128);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_adc_absolute_x(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1557,30 +1556,30 @@ fn test_instruction_adc_absolute_x() {
 fn instruction_adc_index_indirect(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
+    let x = nes.x.get() as usize;
     let zero_address =  memory[pc+1] as usize;
-    let address = ((zero_address + X) % 256) as usize;
+    let address = ((zero_address + x) % 256) as usize;
     let low_byte = memory[address] as usize;
     let high_byte = memory[address+1] as usize;
     let operand = memory[(high_byte << 8) | low_byte] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1597,10 +1596,10 @@ fn test_instruction_adc_index_indirect() {
         memory[103] = 128;
         memory[129] = 128;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_adc_index_indirect(&nes);
-    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.a.get(), 128);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_adc_index_indirect(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1609,29 +1608,29 @@ fn test_instruction_adc_index_indirect() {
 fn instruction_adc_indirect_indexed(nes : &Nes) {
  let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let Y = nes.Y.get() as usize;
+    let y = nes.y.get() as usize;
     let zero_address =  memory[pc+1] as usize;
     let low_byte = memory[zero_address] as usize;
     let high_byte = memory[zero_address+1] as usize;
-    let operand = memory[((high_byte << 8) | low_byte) + Y] as u16;
+    let operand = memory[((high_byte << 8) | low_byte) + y] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1649,10 +1648,10 @@ fn test_instruction_adc_indirect_indexed() {
         memory[127] = 127;
         memory[128] = 128;
     }
-    nes.A.set(64);
-    nes.Y.set(1);
+    nes.a.set(64);
+    nes.y.set(1);
     instruction_adc_indirect_indexed(&nes);
-    assert_eq!(nes.A.get(), 128);
+    assert_eq!(nes.a.get(), 128);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_adc_indirect_indexed(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1664,23 +1663,23 @@ fn instruction_sbc_immediate(nes : &Nes) {
     let memory = nes.memory.borrow();
     let operand = !memory[pc+1] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1693,9 +1692,9 @@ fn test_instruction_sbc_immediate() {
         memory[1] = 64;
         memory[3] = 128;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_sbc_immediate(&nes);
-    assert_eq!(nes.A.get(), 0xff);
+    assert_eq!(nes.a.get(), 0xff);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_immediate(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1706,23 +1705,23 @@ fn instruction_sbc_zeropage(nes : &Nes) {
     let memory = nes.memory.borrow();
     let operand = !memory[memory[pc+1] as usize] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1737,9 +1736,9 @@ fn test_instruction_sbc_zeropage() {
         memory[3] = 128;
         memory[128] = 128;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_sbc_zeropage(&nes);
-    assert_eq!(nes.A.get(), 0xff);
+    assert_eq!(nes.a.get(), 0xff);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_zeropage(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1749,27 +1748,27 @@ fn test_instruction_sbc_zeropage() {
 fn instruction_sbc_zeropage_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
-    let address = ((memory[pc+1] as usize) + X) % 256;
+    let x = nes.x.get() as usize;
+    let address = ((memory[pc+1] as usize) + x) % 256;
     let operand = !memory[address] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1784,10 +1783,10 @@ fn test_instruction_sbc_zeropage_x() {
         memory[3] = 127;
         memory[128] = 128;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_sbc_zeropage_x(&nes);
-    assert_eq!(nes.A.get(), 0xff);
+    assert_eq!(nes.a.get(), 0xff);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_zeropage_x(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1801,23 +1800,23 @@ fn instruction_sbc_absolute(nes : &Nes) {
     let address =  (high_byte << 8) | (memory[pc+1] as usize);
     let operand = !memory[address] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+3) as u16);
 }
@@ -1832,9 +1831,9 @@ fn test_instruction_sbc_absolute() {
         memory[3] = 8;
         memory[8] = 128;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_sbc_absolute(&nes);
-    assert_eq!(nes.A.get(), 0xff);
+    assert_eq!(nes.a.get(), 0xff);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_absolute(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1845,27 +1844,27 @@ fn instruction_sbc_absolute_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
     let high_byte = memory[pc+2] as usize;
-    let X = nes.X.get() as usize;
-    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + X;
+    let x = nes.x.get() as usize;
+    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + x;
     let operand = !memory[address] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+3) as u16);
 }
@@ -1880,10 +1879,10 @@ fn test_instruction_sbc_absolute_x() {
         memory[3] = 8;
         memory[8] = 128;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_sbc_absolute_x(&nes);
-    assert_eq!(nes.A.get(), 0xff);
+    assert_eq!(nes.a.get(), 0xff);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_absolute_x(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1892,30 +1891,30 @@ fn test_instruction_sbc_absolute_x() {
 fn instruction_sbc_index_indirect(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
+    let x = nes.x.get() as usize;
     let zero_address =  memory[pc+1] as usize;
-    let address = ((zero_address + X) % 256) as usize;
+    let address = ((zero_address + x) % 256) as usize;
     let low_byte = memory[address] as usize;
     let high_byte = memory[address+1] as usize;
     let operand = !memory[(high_byte << 8) | low_byte] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1932,10 +1931,10 @@ fn test_instruction_sbc_index_indirect() {
         memory[103] = 128;
         memory[129] = 128;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_sbc_index_indirect(&nes);
-    assert_eq!(nes.A.get(), 0xff);
+    assert_eq!(nes.a.get(), 0xff);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_index_indirect(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -1944,29 +1943,29 @@ fn test_instruction_sbc_index_indirect() {
 fn instruction_sbc_indirect_indexed(nes : &Nes) {
  let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let Y = nes.Y.get() as usize;
+    let y = nes.y.get() as usize;
     let zero_address =  memory[pc+1] as usize;
     let low_byte = memory[zero_address] as usize;
     let high_byte = memory[zero_address+1] as usize;
-    let operand = !memory[((high_byte << 8) | low_byte) + Y] as u16;
+    let operand = !memory[((high_byte << 8) | low_byte) + y] as u16;
     update_processor_status_flag(operand as u16, &nes.processor_status_flag);
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let carry = if (nes.processor_status_flag.get() & 1) == 1 { // Check if there was carry from previous add operation
         1
     }
     else {
         0
     };
-    let sum =  A + operand + carry;
-    if ((A ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
+    let sum =  a + operand + carry;
+    if ((a ^ sum) & (operand ^ sum) & 0x80) > 0 { // Overflow detected! 💥
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b1000000);
     }
     if sum > 0xff { // Carry detected!
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
-        nes.A.set(0xff);
+        nes.a.set(0xff);
     }
     else {
-        nes.A.set(sum as u8);
+        nes.a.set(sum as u8);
     }
     nes.program_counter.set((pc+2) as u16);
 }
@@ -1984,10 +1983,10 @@ fn test_instruction_sbc_indirect_indexed() {
         memory[127] = 127;
         memory[128] = 128;
     }
-    nes.A.set(64);
-    nes.Y.set(1);
+    nes.a.set(64);
+    nes.y.set(1);
     instruction_sbc_indirect_indexed(&nes);
-    assert_eq!(nes.A.get(), 0xff);
+    assert_eq!(nes.a.get(), 0xff);
     assert_eq!(nes.processor_status_flag.get() & 0b1000000, 0b1000000);
     instruction_sbc_indirect_indexed(&nes);
     assert_eq!(nes.processor_status_flag.get() & 1, 1);
@@ -2009,7 +2008,7 @@ fn test_instruction_nop() {
 
 fn instruction_pha(nes : &Nes) {
     let mut memory = nes.memory.borrow_mut();
-    memory[nes.stack_pointer.get() as usize + 0x100] = nes.A.get();
+    memory[nes.stack_pointer.get() as usize + 0x100] = nes.a.get();
     nes.stack_pointer.set(nes.stack_pointer.get()+1);
     nes.program_counter.set(nes.program_counter.get()+1);
 }
@@ -2018,7 +2017,7 @@ fn instruction_pha(nes : &Nes) {
 
 fn test_instruction_pha() {
     let nes = Nes::new();
-    nes.A.set(69);
+    nes.a.set(69);
     instruction_pha(&nes);
     let memory = nes.memory.borrow();
     assert_eq!(memory[0x100], 69);
@@ -2042,8 +2041,8 @@ fn test_instruction_php() {
 
 fn instruction_pla(nes : &Nes) {
     let memory = nes.memory.borrow_mut();
-    nes.A.set(memory[nes.stack_pointer.get() as usize + 0x100]);
-    update_processor_status_flag(nes.A.get() as u16, &nes.processor_status_flag);
+    nes.a.set(memory[nes.stack_pointer.get() as usize + 0x100]);
+    update_processor_status_flag(nes.a.get() as u16, &nes.processor_status_flag);
     nes.stack_pointer.set(nes.stack_pointer.get()-1);
     nes.program_counter.set(nes.program_counter.get()+1);
 }
@@ -2057,7 +2056,7 @@ fn test_instruction_pla() {
     }
     nes.stack_pointer.set(1);
     instruction_pla(&nes);
-    assert_eq!(nes.A.get(), 69);
+    assert_eq!(nes.a.get(), 69);
 }
 
 fn instruction_plp(nes : &Nes) {
@@ -2084,10 +2083,10 @@ fn test_instruction_plp() {
 fn instruction_and_immediate(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let operand = memory[pc+1] as u16;
-    let result = A & operand;
-    nes.A.set(result as u8);
+    let result = a & operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2100,18 +2099,18 @@ fn test_instruction_and_immediate() {
         memory[1] = 0;
         memory[3] = 128;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_and_immediate(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 fn instruction_and_zeropage(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
     let operand = memory[memory[pc+1] as usize] as u16;
-    let A = nes.A.get() as u16;
-    let result = A & operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a & operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2124,21 +2123,21 @@ fn test_instruction_and_zeropage() {
         memory[1] = 64;
         memory[64] = 0;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_and_zeropage(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 
 fn instruction_and_zeropage_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
-    let address = ((memory[pc+1] as usize) + X) % 256;
+    let x = nes.x.get() as usize;
+    let address = ((memory[pc+1] as usize) + x) % 256;
     let operand = memory[address] as u16;
-    let A = nes.A.get() as u16;
-    let result = A & operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a & operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2151,10 +2150,10 @@ fn test_instruction_and_zeropage_x() {
         memory[1] = 63;
         memory[64] = 0;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_and_zeropage_x(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 
@@ -2164,9 +2163,9 @@ fn instruction_and_absolute(nes : &Nes) {
     let high_byte = memory[pc+2] as usize;
     let address =  (high_byte << 8) | (memory[pc+1] as usize);
     let operand = memory[address] as u16;
-    let A = nes.A.get() as u16;
-    let result = A & operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a & operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+3) as u16);
 }
@@ -2179,9 +2178,9 @@ fn test_instruction_and_absolute() {
         memory[2] = 8;
         memory[2048] = 0;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_and_absolute(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 
@@ -2189,12 +2188,12 @@ fn instruction_and_absolute_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
     let high_byte = memory[pc+2] as usize;
-    let X = nes.X.get() as usize;
-    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + X;
+    let x = nes.x.get() as usize;
+    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + x;
     let operand = memory[address] as u16;
-     let A = nes.A.get() as u16;
-    let result = A & operand;
-    nes.A.set(result as u8);
+     let a = nes.a.get() as u16;
+    let result = a & operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+3) as u16);
 }
@@ -2209,25 +2208,25 @@ fn test_instruction_and_absolute_x() {
         memory[3] = 8;
         memory[8] = 128;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_and_absolute_x(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 
 fn instruction_and_index_indirect(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
+    let x = nes.x.get() as usize;
     let zero_address =  memory[pc+1] as usize;
-    let address = ((zero_address + X) % 256) as usize;
+    let address = ((zero_address + x) % 256) as usize;
     let low_byte = memory[address] as usize;
     let high_byte = memory[address+1] as usize;
     let operand = memory[(high_byte << 8) | low_byte] as u16;
-    let A = nes.A.get() as u16;
-    let result = A & operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a & operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2241,23 +2240,23 @@ fn test_instruction_and_index_indirect() {
         memory[101] = 64;
         memory[64] = 0;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_and_index_indirect(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 fn instruction_and_indirect_indexed(nes : &Nes) {
  let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let Y = nes.Y.get() as usize;
+    let y = nes.y.get() as usize;
     let zero_address =  memory[pc+1] as usize;
     let low_byte = memory[zero_address] as usize;
     let high_byte = memory[zero_address+1] as usize;
-    let operand = memory[((high_byte << 8) | low_byte) + Y] as u16;
-    let A = nes.A.get() as u16;
-    let result = A & operand;
-    nes.A.set(result as u8);
+    let operand = memory[((high_byte << 8) | low_byte) + y] as u16;
+    let a = nes.a.get() as u16;
+    let result = a & operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2271,10 +2270,10 @@ fn test_instruction_and_indirect_indexed() {
         memory[100] = 64;
         memory[65] = 0;
     }
-    nes.A.set(64);
-    nes.Y.set(1);
+    nes.a.set(64);
+    nes.y.set(1);
     instruction_and_indirect_indexed(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 //EOR Opcodes
@@ -2282,10 +2281,10 @@ fn test_instruction_and_indirect_indexed() {
 fn instruction_eor_immediate(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let operand = memory[pc+1] as u16;
-    let result = A ^ operand;
-    nes.A.set(result as u8);
+    let result = a ^ operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2297,18 +2296,18 @@ fn test_instruction_eor_immediate() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 64;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_eor_immediate(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 fn instruction_eor_zeropage(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
     let operand = memory[memory[pc+1] as usize] as u16;
-    let A = nes.A.get() as u16;
-    let result = A ^ operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a ^ operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2321,21 +2320,21 @@ fn test_instruction_eor_zeropage() {
         memory[1] = 64;
         memory[64] = 64;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_eor_zeropage(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 
 fn instruction_eor_zeropage_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
-    let address = ((memory[pc+1] as usize) + X) % 256;
+    let x = nes.x.get() as usize;
+    let address = ((memory[pc+1] as usize) + x) % 256;
     let operand = memory[address] as u16;
-    let A = nes.A.get() as u16;
-    let result = A ^ operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a ^ operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2348,10 +2347,10 @@ fn test_instruction_eor_zeropage_x() {
         memory[1] = 63;
         memory[64] = 64;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_eor_zeropage_x(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 
@@ -2361,9 +2360,9 @@ fn instruction_eor_absolute(nes : &Nes) {
     let high_byte = memory[pc+2] as usize;
     let address =  (high_byte << 8) | (memory[pc+1] as usize);
     let operand = memory[address] as u16;
-    let A = nes.A.get() as u16;
-    let result = A ^ operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a ^ operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+3) as u16);
 }
@@ -2376,9 +2375,9 @@ fn test_instruction_eor_absolute() {
         memory[2] = 8;
         memory[2048] = 64;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_eor_absolute(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 
@@ -2386,12 +2385,12 @@ fn instruction_eor_absolute_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
     let high_byte = memory[pc+2] as usize;
-    let X = nes.X.get() as usize;
-    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + X;
+    let x = nes.x.get() as usize;
+    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + x;
     let operand = memory[address] as u16;
-     let A = nes.A.get() as u16;
-    let result = A ^ operand;
-    nes.A.set(result as u8);
+     let a = nes.a.get() as u16;
+    let result = a ^ operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+3) as u16);
 }
@@ -2404,25 +2403,25 @@ fn test_instruction_eor_absolute_x() {
         memory[1] = 254;
         memory[255] = 64;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_eor_absolute_x(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 
 fn instruction_eor_index_indirect(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
+    let x = nes.x.get() as usize;
     let zero_address =  memory[pc+1] as usize;
-    let address = ((zero_address + X) % 256) as usize;
+    let address = ((zero_address + x) % 256) as usize;
     let low_byte = memory[address] as usize;
     let high_byte = memory[address+1] as usize;
     let operand = memory[(high_byte << 8) | low_byte] as u16;
-    let A = nes.A.get() as u16;
-    let result = A ^ operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a ^ operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2436,23 +2435,23 @@ fn test_instruction_eor_index_indirect() {
         memory[101] = 64;
         memory[64] = 64;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_eor_index_indirect(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
 fn instruction_eor_indirect_indexed(nes : &Nes) {
  let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let Y = nes.Y.get() as usize;
+    let y = nes.y.get() as usize;
     let zero_address =  memory[pc+1] as usize;
     let low_byte = memory[zero_address] as usize;
     let high_byte = memory[zero_address+1] as usize;
-    let operand = memory[((high_byte << 8) | low_byte) + Y] as u16;
-    let A = nes.A.get() as u16;
-    let result = A ^ operand;
-    nes.A.set(result as u8);
+    let operand = memory[((high_byte << 8) | low_byte) + y] as u16;
+    let a = nes.a.get() as u16;
+    let result = a ^ operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2466,21 +2465,21 @@ fn test_instruction_eor_indirect_indexed() {
         memory[100] = 64;
         memory[65] = 64;
     }
-    nes.A.set(64);
-    nes.Y.set(1);
+    nes.a.set(64);
+    nes.y.set(1);
     instruction_eor_indirect_indexed(&nes);
-    assert_eq!(nes.A.get(), 0);
+    assert_eq!(nes.a.get(), 0);
 }
 
-// ORA Opcodes
+// ORa Opcodes
 
 fn instruction_ora_immediate(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let A = nes.A.get() as u16;
+    let a = nes.a.get() as u16;
     let operand = memory[pc+1] as u16;
-    let result = A | operand;
-    nes.A.set(result as u8);
+    let result = a | operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2492,18 +2491,18 @@ fn test_instruction_ora_immediate() {
         let mut memory = nes.memory.borrow_mut();
         memory[1] = 64;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_ora_immediate(&nes);
-    assert_eq!(nes.A.get(), 64);
+    assert_eq!(nes.a.get(), 64);
 }
 
 fn instruction_ora_zeropage(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
     let operand = memory[memory[pc+1] as usize] as u16;
-    let A = nes.A.get() as u16;
-    let result = A | operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a | operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2516,21 +2515,21 @@ fn test_instruction_ora_zeropage() {
         memory[1] = 64;
         memory[64] = 64;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_ora_zeropage(&nes);
-    assert_eq!(nes.A.get(), 64);
+    assert_eq!(nes.a.get(), 64);
 }
 
 
 fn instruction_ora_zeropage_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
-    let address = ((memory[pc+1] as usize) + X) % 256;
+    let x = nes.x.get() as usize;
+    let address = ((memory[pc+1] as usize) + x) % 256;
     let operand = memory[address] as u16;
-    let A = nes.A.get() as u16;
-    let result = A | operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a | operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2543,10 +2542,10 @@ fn test_instruction_ora_zeropage_x() {
         memory[1] = 63;
         memory[64] = 64;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_ora_zeropage_x(&nes);
-    assert_eq!(nes.A.get(), 64);
+    assert_eq!(nes.a.get(), 64);
 }
 
 
@@ -2556,9 +2555,9 @@ fn instruction_ora_absolute(nes : &Nes) {
     let high_byte = memory[pc+2] as usize;
     let address =  (high_byte << 8) | (memory[pc+1] as usize);
     let operand = memory[address] as u16;
-    let A = nes.A.get() as u16;
-    let result = A | operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a | operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+3) as u16);
 }
@@ -2571,9 +2570,9 @@ fn test_instruction_ora_absolute() {
         memory[2] = 8;
         memory[2048] = 64;
     }
-    nes.A.set(64);
+    nes.a.set(64);
     instruction_ora_absolute(&nes);
-    assert_eq!(nes.A.get(), 64);
+    assert_eq!(nes.a.get(), 64);
 }
 
 
@@ -2581,12 +2580,12 @@ fn instruction_ora_absolute_x(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
     let high_byte = memory[pc+2] as usize;
-    let X = nes.X.get() as usize;
-    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + X;
+    let x = nes.x.get() as usize;
+    let address =  ((high_byte << 8) | (memory[pc+1] as usize)) + x;
     let operand = memory[address] as u16;
-     let A = nes.A.get() as u16;
-    let result = A | operand;
-    nes.A.set(result as u8);
+     let a = nes.a.get() as u16;
+    let result = a | operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+3) as u16);
 }
@@ -2599,25 +2598,25 @@ fn test_instruction_ora_absolute_x() {
         memory[1] = 254;
         memory[255] = 64;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_ora_absolute_x(&nes);
-    assert_eq!(nes.A.get(), 64);
+    assert_eq!(nes.a.get(), 64);
 }
 
 
 fn instruction_ora_index_indirect(nes : &Nes) {
     let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let X = nes.X.get() as usize;
+    let x = nes.x.get() as usize;
     let zero_address =  memory[pc+1] as usize;
-    let address = ((zero_address + X) % 256) as usize;
+    let address = ((zero_address + x) % 256) as usize;
     let low_byte = memory[address] as usize;
     let high_byte = memory[address+1] as usize;
     let operand = memory[(high_byte << 8) | low_byte] as u16;
-    let A = nes.A.get() as u16;
-    let result = A | operand;
-    nes.A.set(result as u8);
+    let a = nes.a.get() as u16;
+    let result = a | operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2631,23 +2630,23 @@ fn test_instruction_ora_index_indirect() {
         memory[101] = 64;
         memory[64] = 64;
     }
-    nes.A.set(64);
-    nes.X.set(1);
+    nes.a.set(64);
+    nes.x.set(1);
     instruction_ora_index_indirect(&nes);
-    assert_eq!(nes.A.get(), 64);
+    assert_eq!(nes.a.get(), 64);
 }
 
 fn instruction_ora_indirect_indexed(nes : &Nes) {
  let pc = nes.program_counter.get() as usize;
     let memory = nes.memory.borrow();
-    let Y = nes.Y.get() as usize;
+    let y = nes.y.get() as usize;
     let zero_address =  memory[pc+1] as usize;
     let low_byte = memory[zero_address] as usize;
     let high_byte = memory[zero_address+1] as usize;
-    let operand = memory[((high_byte << 8) | low_byte) + Y] as u16;
-    let A = nes.A.get() as u16;
-    let result = A | operand;
-    nes.A.set(result as u8);
+    let operand = memory[((high_byte << 8) | low_byte) + y] as u16;
+    let a = nes.a.get() as u16;
+    let result = a | operand;
+    nes.a.set(result as u8);
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.program_counter.set((pc+2) as u16);
 }
@@ -2661,10 +2660,10 @@ fn test_instruction_ora_indirect_indexed() {
         memory[100] = 64;
         memory[65] = 64;
     }
-    nes.A.set(64);
-    nes.Y.set(1);
+    nes.a.set(64);
+    nes.y.set(1);
     instruction_ora_indirect_indexed(&nes);
-    assert_eq!(nes.A.get(), 64);
+    assert_eq!(nes.a.get(), 64);
 }
 
 // Branch Opcodes
@@ -2748,8 +2747,8 @@ fn instruction_bit_zeropage(nes : &Nes) {
     let memory = nes.memory.borrow();
     let zero_address = memory[pc+1] as usize;
     let operand = memory[zero_address];
-    let A = nes.A.get();
-    let result = A & operand;
+    let a = nes.a.get();
+    let result = a & operand;
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.processor_status_flag.set(nes.processor_status_flag.get() | (operand & 0b11000000));
     nes.program_counter.set((pc+2) as u16);
@@ -2773,8 +2772,8 @@ fn instruction_bit_absolute(nes : &Nes) {
     let lowbyte = memory[pc+1] as usize;
     let high_byte = memory[pc+1] as usize;
     let operand = memory[(high_byte << 8) | lowbyte];
-    let A = nes.A.get();
-    let result = A & operand;
+    let a = nes.a.get();
+    let result = a & operand;
     update_processor_status_flag(result as u16, &nes.processor_status_flag);
     nes.processor_status_flag.set(nes.processor_status_flag.get() | (operand & 0b11000000));
     nes.program_counter.set((pc+2) as u16);
@@ -2983,5 +2982,5 @@ fn test_instruction_rti() {
     assert_eq!(nes.program_counter.get(), 2048);
     assert_eq!(nes.stack_pointer.get(), 0);
     assert_eq!(nes.processor_status_flag.get(), 8);
-
 }
+

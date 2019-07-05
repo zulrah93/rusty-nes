@@ -120,6 +120,9 @@ impl CPU {
         opcodes.insert(0x40, instruction_rti);
         opcodes.insert(0x0a, instruction_asl_accumulator);
         opcodes.insert(0x06, instruction_asl_zeropage);
+        opcodes.insert(0x16, instruction_asl_zeropage_x);
+        opcodes.insert(0x0e, instruction_asl_absolute);
+        opcodes.insert(0x1e, instruction_asl_absolute_x);
         CPU {opcodes: opcodes}
     }
 
@@ -3039,4 +3042,123 @@ fn test_instruction_asl_zeropage() {
     let memory = nes.memory.borrow();
     assert_eq!(memory[0xff], 0xfe);
     assert_eq!(nes.processor_status_flag.get(), 0x81);
+}
+
+fn instruction_asl_zeropage_x(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let x = nes.x.get() as usize;
+    let zero_address = memory[pc+1] as usize;
+    let operand = memory[(zero_address + x) % 256];
+    if (operand & 0b10000000) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+    let result = operand << 1;
+    if (result & 0b10000000) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    memory[(zero_address + x) % 256] = result;
+    nes.program_counter.set((pc as u16) + 2);
+}
+
+#[test]
+fn test_instruction_asl_zeropage_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 0xfd;
+        memory[0xfe] = 1;
+        memory[3] = 0xfe;
+        memory[0xff] = 0xff;  
+    }
+    nes.x.set(1);
+    instruction_asl_zeropage_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xfe], 0x02);
+    drop(memory);
+    instruction_asl_zeropage_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xff], 0xfe);
+    assert_eq!(nes.processor_status_flag.get(), 0x81);
+}
+
+fn instruction_asl_absolute(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let absolute_address = (high_byte << 8) | low_byte;
+    let operand = memory[absolute_address] as usize;
+    if (operand & 0b10000000) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+    let result = operand << 1;
+    if (result & 0b10000000) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    memory[absolute_address] = result as u8;
+    nes.program_counter.set((pc as u16) + 3);
+}
+
+#[test]
+fn test_instruction_asl_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2048] = 1;
+        memory[4] = 0xff;
+        memory[0xff] = 0xff;
+    }
+    instruction_asl_absolute(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[2048], 2);
+    drop(memory);
+    instruction_asl_absolute(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xff], 0xfe);
+    assert_eq!(nes.processor_status_flag.get(), 0x81);
+}
+
+
+fn instruction_asl_absolute_x(nes : &Nes) {
+    let mut memory = nes.memory.borrow_mut();
+    let pc = nes.program_counter.get() as usize;
+    let x = nes.x.get() as usize;
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let absolute_address = (high_byte << 8) | low_byte;
+    println!("x = {} absolute_address = {}", x, absolute_address);
+    let operand = memory[absolute_address+x] as usize;
+    if (operand & 0b10000000) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+    let result = (operand + x) << 1;
+    if (result & 0b10000000) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    println!("result = {}", result);
+    memory[absolute_address+x] = result as u8;
+    nes.program_counter.set((pc as u16) + 3);
+}
+
+#[test]
+fn test_instruction_asl_absolute_x() {
+   let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2409] = 1;
+        memory[4] = 0xfe;
+        memory[0xff] = 0xff;
+    }
+    nes.x.set(1);
+    instruction_asl_absolute_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[2049], 2);
+    drop(memory);
+    instruction_asl_absolute_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xff], 0x0);
+    assert_eq!(nes.processor_status_flag.get(), 0x1);
 }

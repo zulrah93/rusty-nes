@@ -123,6 +123,13 @@ impl CPU {
         opcodes.insert(0x16, instruction_asl_zeropage_x);
         opcodes.insert(0x0e, instruction_asl_absolute);
         opcodes.insert(0x1e, instruction_asl_absolute_x);
+        opcodes.insert(0xc9, instruction_cmp_immediate);
+        opcodes.insert(0xc5, instruction_cmp_zeropage);
+        opcodes.insert(0xd5, instruction_cmp_zeropage_x);
+        opcodes.insert(0xcd, instruction_cmp_absolute);
+        opcodes.insert(0xdd, instruction_cmp_absolute_x);
+        opcodes.insert(0xd9, instruction_cmp_absolute_y);
+        opcodes.insert(0xc1, instruction_cmp_index_indirect);
         CPU {opcodes: opcodes}
     }
 
@@ -3161,4 +3168,262 @@ fn test_instruction_asl_absolute_x() {
     let memory = nes.memory.borrow();
     assert_eq!(memory[0xff], 0x0);
     assert_eq!(nes.processor_status_flag.get(), 0x1);
+}
+
+// Compare Opcodes
+
+fn instruction_cmp_immediate(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let a = nes.a.get();
+    let operand = memory[pc+1];
+    if a == operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+    else if a < operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    if a >= operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    } 
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_cmp_immediate() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[3] = 1;
+    }
+    instruction_cmp_immediate(&nes); 
+    assert_eq!(nes.processor_status_flag.get(), 3);
+    nes.processor_status_flag.set(0);
+    instruction_cmp_immediate(&nes);
+    assert_ne!(nes.processor_status_flag.get() & 0b10000000, 0)
+
+}
+
+
+fn instruction_cmp_zeropage(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let a = nes.a.get();
+    let zero_address = memory[pc+1] as usize;
+    let operand = memory[zero_address];
+    if a == operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+    else if a < operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    if a >= operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    } 
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_cmp_zeropage() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[3] = 0xff;
+        memory[0xff] = 1;
+    }
+    instruction_cmp_zeropage(&nes); 
+    assert_eq!(nes.processor_status_flag.get(), 3);
+    nes.processor_status_flag.set(0);
+    instruction_cmp_zeropage(&nes);
+    assert_ne!(nes.processor_status_flag.get() & 0b10000000, 0)
+
+}
+
+fn instruction_cmp_zeropage_x(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let a = nes.a.get();
+    let x = nes.x.get() as usize;
+    let zero_address = memory[pc+1] as usize;
+    let operand = memory[(zero_address+x) % 256];
+    if a == operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+    else if a < operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    if a >= operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    } 
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_cmp_zeropage_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[3] = 0xfe;
+        memory[0xff] = 1;
+    }
+    nes.x.set(1);
+    instruction_cmp_zeropage_x(&nes); 
+    assert_eq!(nes.processor_status_flag.get(), 3);
+    nes.processor_status_flag.set(0);
+    instruction_cmp_zeropage_x(&nes);
+    assert_ne!(nes.processor_status_flag.get() & 0b10000000, 0)
+
+}
+
+fn instruction_cmp_absolute(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let a = nes.a.get();
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let absolute_address = (high_byte << 8) | low_byte;
+    let operand = memory[absolute_address];
+    if a == operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+    else if a < operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    if a >= operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    } 
+    nes.program_counter.set((pc+3) as u16);
+}
+
+#[test]
+fn test_instruction_cmp_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[5] = 0x8;
+        memory[0x800] = 1;
+    }
+    instruction_cmp_absolute(&nes); 
+    assert_eq!(nes.processor_status_flag.get(), 3);
+    nes.processor_status_flag.set(0);
+    instruction_cmp_absolute(&nes);
+    assert_ne!(nes.processor_status_flag.get() & 0b10000000, 0)
+
+}
+
+fn instruction_cmp_absolute_x(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let a = nes.a.get();
+    let x = nes.x.get() as usize;
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let absolute_address = (high_byte << 8) | low_byte;
+    let operand = memory[absolute_address+x];
+    if a == operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+    else if a < operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    if a >= operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    } 
+    nes.program_counter.set((pc+3) as u16);
+}
+
+#[test]
+fn test_instruction_cmp_absolute_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[5] = 0x8;
+        memory[0x801] = 1;
+    }
+    nes.x.set(1);
+    instruction_cmp_absolute_x(&nes); 
+    assert_eq!(nes.processor_status_flag.get(), 3);
+    nes.processor_status_flag.set(0);
+    instruction_cmp_absolute_x(&nes);
+    assert_ne!(nes.processor_status_flag.get() & 0b10000000, 0)
+
+}
+
+fn instruction_cmp_absolute_y(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let a = nes.a.get();
+    let y = nes.y.get() as usize;
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let absolute_address = (high_byte << 8) | low_byte;
+    let operand = memory[absolute_address+y];
+    if a == operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+    else if a < operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    if a >= operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    } 
+    nes.program_counter.set((pc+3) as u16);
+}
+
+#[test]
+fn test_instruction_cmp_absolute_y() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[5] = 0x8;
+        memory[0x801] = 1;
+    }
+    nes.y.set(1);
+    instruction_cmp_absolute_y(&nes); 
+    assert_eq!(nes.processor_status_flag.get(), 3);
+    nes.processor_status_flag.set(0);
+    instruction_cmp_absolute_y(&nes);
+    assert_ne!(nes.processor_status_flag.get() & 0b10000000, 0)
+
+}
+
+fn instruction_cmp_index_indirect(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let memory = nes.memory.borrow();
+    let a = nes.a.get();
+    let x = nes.x.get() as usize;
+    let zero_address = (memory[pc+1] as usize + x) % 256;
+    let low_byte = memory[zero_address] as usize;
+    let high_byte = memory[zero_address+1] as usize;
+    let indirect_address = (high_byte << 8) | low_byte;
+    let operand = memory[indirect_address];
+    println!("indirect_address = {} operand = {}", indirect_address, operand);
+    if a == operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+    else if a < operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
+    }
+    if a >= operand {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    } 
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_cmp_index_indirect() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[0x03] = 0x08;
+        memory[0xa] = 0x08;
+        memory[0x800] = 0x01;
+    }
+    nes.x.set(1);
+    instruction_cmp_index_indirect(&nes); 
+    assert_eq!(nes.processor_status_flag.get(), 3);
+    nes.processor_status_flag.set(0);
+    instruction_cmp_index_indirect(&nes);
+    assert_ne!(nes.processor_status_flag.get() & 0b10000000, 0)
+
 }

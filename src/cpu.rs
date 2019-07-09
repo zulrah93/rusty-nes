@@ -136,6 +136,10 @@ impl CPU {
         opcodes.insert(0xc0, instruction_cpy_immediate);
         opcodes.insert(0xc4, instruction_cpy_zeropage);
         opcodes.insert(0xcc, instruction_cpy_absolute);
+        opcodes.insert(0xc6, instruction_dec_zeropage);
+        opcodes.insert(0xd6, instruction_dec_zeropage_x);
+        opcodes.insert(0xce, instruction_dec_absolute);
+        opcodes.insert(0xde, instruction_dec_absolute_x);
         CPU {opcodes: opcodes}
     }
 
@@ -3643,3 +3647,128 @@ fn test_instruction_cpy_absolute() {
     assert_ne!(nes.processor_status_flag.get() & 0b10000000, 0)
 
 }
+
+//Decrement opcodes
+
+fn instruction_dec_zeropage(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let zero_address = memory[pc+1] as usize;
+    let result = (memory[zero_address] as usize) + 0xff;
+    update_processor_status_flag(result as u16, &nes.processor_status_flag);
+    memory[zero_address] = result as u8;
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_dec_zeropage() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[0x1] = 0xff;
+        memory[0x3] = 0xfe;
+        memory[0xfe] = 2;
+    }
+    instruction_dec_zeropage(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xff], 0xff);
+    drop(memory);
+    instruction_dec_zeropage(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xfe], 0x1);
+    drop(memory);
+}
+
+fn instruction_dec_zeropage_x(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let x = nes.x.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let zero_address = (memory[pc+1] as usize + x) % 256;
+    let result = (memory[zero_address] as usize) + 0xff;
+    update_processor_status_flag(result as u16, &nes.processor_status_flag);
+    memory[zero_address] = result as u8;
+    nes.program_counter.set((pc+2) as u16);
+}
+
+#[test]
+fn test_instruction_dec_zeropage_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[0x1] = 0xfe;
+        memory[0x3] = 0xfd;
+        memory[0xfe] = 2;
+    }
+    nes.x.set(1);
+    instruction_dec_zeropage_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xff], 0xff);
+    drop(memory);
+    instruction_dec_zeropage_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0xfe], 0x1);
+    drop(memory);
+}
+
+fn instruction_dec_absolute(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let absolute_address = (high_byte << 8) | low_byte;
+    let result = (memory[absolute_address] as usize) + 0xff;
+    update_processor_status_flag(result as u16, &nes.processor_status_flag);
+    memory[absolute_address] = result as u8;
+    nes.program_counter.set((pc+3) as u16);
+}
+
+#[test]
+fn test_instruction_dec_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[5] = 8;
+        memory[2048] = 2;
+    }
+    instruction_dec_absolute(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0x0], 0xff);
+    drop(memory);
+    instruction_dec_absolute(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[2048], 0x1);
+    drop(memory);
+}
+
+fn instruction_dec_absolute_x(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let x = nes.x.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let absolute_address = ((high_byte << 8) | low_byte) + x;
+    let result = (memory[absolute_address] as usize) + 0xff;
+    update_processor_status_flag(result as u16, &nes.processor_status_flag);
+    memory[absolute_address] = result as u8;
+    nes.program_counter.set((pc+3) as u16);
+}
+
+#[test]
+fn test_instruction_dec_absolute_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[5] = 8;
+        memory[2049] = 2;
+    }
+    nes.x.set(1);
+    instruction_dec_absolute_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[0x1], 0xff);
+    drop(memory);
+    instruction_dec_absolute_x(&nes);
+    let memory = nes.memory.borrow();
+    assert_eq!(memory[2049], 0x1);
+    drop(memory);
+}
+

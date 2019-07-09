@@ -3147,7 +3147,6 @@ fn instruction_asl_absolute_x(nes : &Nes) {
     let low_byte = memory[pc+1] as usize;
     let high_byte = memory[pc+2] as usize;
     let absolute_address = (high_byte << 8) | low_byte;
-    println!("x = {} absolute_address = {}", x, absolute_address);
     let operand = memory[absolute_address+x] as usize;
     if (operand & 0b10000000) != 0 {
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
@@ -3156,7 +3155,6 @@ fn instruction_asl_absolute_x(nes : &Nes) {
     if (result & 0b10000000) != 0 {
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 0b10000000);
     }
-    println!("result = {}", result);
     memory[absolute_address+x] = result as u8;
     nes.program_counter.set((pc as u16) + 3);
 }
@@ -3409,7 +3407,6 @@ fn instruction_cmp_index_indirect(nes : &Nes) {
     let high_byte = memory[zero_address+1] as usize;
     let indirect_address = (high_byte << 8) | low_byte;
     let operand = memory[indirect_address];
-    println!("indirect_address = {} operand = {}", indirect_address, operand);
     if a == operand {
         nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
     }

@@ -140,6 +140,8 @@ impl CPU {
         opcodes.insert(0xd6, instruction_dec_zeropage_x);
         opcodes.insert(0xce, instruction_dec_absolute);
         opcodes.insert(0xde, instruction_dec_absolute_x);
+        opcodes.insert(0xca, instruction_dex);
+        opcodes.insert(0x88, instruction_dey);
         CPU {opcodes: opcodes}
     }
 
@@ -3772,3 +3774,36 @@ fn test_instruction_dec_absolute_x() {
     drop(memory);
 }
 
+fn instruction_dex(nes : &Nes) {
+    let x = nes.x.get() as usize;
+    let result = x + 0xff;
+    nes.x.set(result as u8);
+    nes.program_counter.set(nes.program_counter.get()+1);
+}
+
+#[test]
+fn test_instruction_dex() {
+    let nes = Nes::new();
+    instruction_dex(&nes);
+    assert_eq!(nes.x.get(), 0xff);
+    nes.x.set(2);
+    instruction_dex(&nes);
+    assert_eq!(nes.x.get(), 1);
+}
+
+fn instruction_dey(nes : &Nes) {
+    let y = nes.y.get() as usize;
+    let result = y + 0xff;
+    nes.y.set(result as u8);
+    nes.program_counter.set(nes.program_counter.get()+1);
+}
+
+#[test]
+fn test_instruction_dey() {
+    let nes = Nes::new();
+    instruction_dey(&nes);
+    assert_eq!(nes.y.get(), 0xff);
+    nes.y.set(2);
+    instruction_dey(&nes);
+    assert_eq!(nes.y.get(), 1);
+}

@@ -9,7 +9,7 @@
             "type": "cppvsdbg",
             "request": "launch",
             "program": "${workspaceFolder}/target/debug/rustynes.exe",
-            "args": [],
+            "args": ["C:\\Users\\Danny\\Documents\\Nes Roms\\donkey kong.nes", "C:\\Users\\Danny\\Documents\\Rust Projects\\rustynes\\NES Classic (FBX).pal"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

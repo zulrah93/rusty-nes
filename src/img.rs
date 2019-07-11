@@ -76,6 +76,7 @@ impl Bitmap {
             }
         }
     }
+
 }
 
 impl PartialEq for Bitmap {

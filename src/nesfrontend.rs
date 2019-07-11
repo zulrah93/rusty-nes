@@ -1,22 +1,16 @@
-use ggez::{Context, GameResult,GameError};
+use ggez::{Context, GameResult};
 use ggez::event::EventHandler;
-use crate::img::Bitmap;
+use crate::rom::Rom;
 
 pub struct NesFrontend {
     // Your state here...
-    bmp : Bitmap
+    rom : Rom
 }
 
 impl NesFrontend {
-    pub fn new() -> GameResult<NesFrontend> {
-        if let Ok(bmp) = Bitmap::new(256, 240) {
-            bmp.fill_color((0, 255, 0, 255));
-            let nes_frontend = NesFrontend { bmp: bmp  };
-            Ok(nes_frontend)
-        }
-        else {
-            Err(GameError::ConfigError("Failed to create bitmap!".to_string()))
-        }
+    pub fn new(rom : Rom) -> GameResult<NesFrontend> {
+        let nes_frontend = NesFrontend { rom: rom  };
+        Ok(nes_frontend)
     }
 }
 
@@ -27,8 +21,9 @@ impl EventHandler for NesFrontend {
         Ok(())
     }
 
-    fn draw(&mut self, _context: &mut Context) -> GameResult<()> {
+    fn draw(&mut self, context: &mut Context) -> GameResult<()> {
         // Draw code here...
-        self.bmp.draw(_context)
+        let bmp = self.rom.vrom_bmps.first().expect("Empty VROM Bitmaps!");
+        bmp.draw(context)
     }
 }

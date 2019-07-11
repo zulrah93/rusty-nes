@@ -1,8 +1,11 @@
+use crate::img::Bitmap;
 use std::fs::File;
 use std::cell::RefCell;
 use std::io::Read;
 use std::error::Error;
 use std::fmt;
+use std::vec::Vec;
+
 
 pub enum Mirroring {
     Horizontal = 0,
@@ -32,13 +35,14 @@ pub struct Rom {
     pub is_pal : bool,
     pub trainer : RefCell<Option<[u8;512]>>,
     pub rom_banks : Vec<[u8;16384]>, // PRG ROM banks
-    pub vrom_banks : Vec<[u8;8192]> // CHR ROM banks
+    pub vrom_banks : Vec<[u8;8192]>, // CHR ROM banks
+    pub vrom_bmps : Vec<Bitmap> // CHR ROM represented as a bitmap image
 
 
 }
 
 impl Rom {
-    pub fn load(file_name : String) -> Result<Rom,String> {
+    pub fn load(file_name : String, palette_file : String) -> Result<Rom,String> {
         println!("Reading {}", file_name);
         if let Ok(file_handle) = &mut File::open(file_name) {
             let mut buffer : Vec<u8> = Vec::new();
@@ -96,6 +100,7 @@ impl Rom {
                             rom_banks.push(rom_bank);
                         }
                         let mut vrom_banks : Vec<[u8;8192]> = Vec::new();
+                        let mut vrom_bmps : Vec<Bitmap> = Vec::new();
                         let offset = (number_of_rom_banks as usize) * 16384;
                         for i in 0..(number_of_vrom_banks as usize) {
                             let mut vrom_bank : [u8;8192] = [0;8192];
@@ -109,6 +114,7 @@ impl Rom {
                                 let end = ((i*8192)+16+8192+offset) as usize;
                                 vrom_bank.copy_from_slice(&buffer[start..end]);
                             }
+                            vrom_bmps.push(chr_to_bitmap(vrom_bank, [0xc,0x17,0x28,0x39], palette_file.clone()));
                             vrom_banks.push(vrom_bank);
                         }
 
@@ -124,10 +130,8 @@ impl Rom {
                             mirroring: mirroring, has_battery_packed_ram: has_battery_packed_ram, has_trainer: has_trainer, 
                             has_four_screen_vram_layout: has_four_screen_vram_layout, rom_mapper_type: mapper_number,
                             is_vs_system_cartidge: is_vs_system_cartidge, number_of_8k_ram_banks: number_of_8k_ram_banks, is_pal: is_pal,
-                            trainer: trainer, rom_banks: rom_banks, vrom_banks: vrom_banks 
-                        })
-
-                        
+                            trainer: trainer, rom_banks: rom_banks, vrom_banks: vrom_banks, vrom_bmps: vrom_bmps
+                        })    
                 }
                 else {
                     Err(String::from("NES file magic 4 byte string is missing!"))
@@ -138,4 +142,62 @@ impl Rom {
             Err(String::from("Failed to open NES Rom!"))
         }
     }
+}
+
+fn load_palette(file_name : String) -> Result<Vec<(u8,u8,u8,u8)>, String> { // Vector of 4-tuple or RGBA
+    let mut palette : Vec<(u8,u8,u8,u8)> = Vec::new();
+    if let Ok(file_handle) = &mut File::open(file_name) {
+            let mut buffer : Vec<u8> = Vec::new();
+            if let Err(e) = file_handle.read_to_end(&mut buffer) {
+                Err(e.description().to_string())
+            }
+            else {
+                for i in (0..(buffer.len()-3)).filter(|x| x % 3 == 0) {
+                    palette.push((buffer[i], buffer[i+1], buffer[i+2], 0xff));
+                }
+                Ok(palette)
+            }
+     }
+     else {
+         Err(String::from("Failed to open NES Palette!"))
+     }
+    
+}
+
+fn chr_to_bitmap(vrom_bank : [u8;8192], selected_palette_indicies : [usize;4],  palette_path : String) -> Bitmap {
+    let palette = load_palette(palette_path).expect("Can't find palette file!");
+    let bmp = Bitmap::new(256, 240).expect("Failed to initialze bitmap!");
+    let mut x = 0;
+    let mut y = 0;
+    for i in 0..0x200 {
+       let mut offset = 0;
+       for j in (0..16).filter(|x| x % 2 == 0) {
+           let low = vrom_bank[(i*16)+j];
+           let high = vrom_bank[(i*16)+j+1];
+           for z in 0..8 {
+               let high_bit = if (high & (0x80 >> z)) != 0 {
+                   1 as usize
+               }
+               else {
+                   0 as usize
+               };
+               let low_bit = if (low & (0x80 >> z)) != 0 {
+                   1 as usize
+               }
+               else {
+                   0 as usize
+               };
+               let palette_index = (high_bit << 1) | low_bit;
+               let rgb = palette[selected_palette_indicies[palette_index]];
+               bmp.set_color((x+z) as u32, (y+offset) as u32, rgb);
+           }
+           offset += 1;
+       }
+       x += 8;
+       if x >= 256 {
+           x = 0;
+           y += 8;
+       }
+    }
+    bmp
 }

@@ -142,6 +142,16 @@ impl CPU {
         opcodes.insert(0xde, instruction_dec_absolute_x);
         opcodes.insert(0xca, instruction_dex);
         opcodes.insert(0x88, instruction_dey);
+        opcodes.insert(0x2a, instruction_rol_accumulator);
+        opcodes.insert(0x26, instruction_rol_zeropage);
+        opcodes.insert(0x36, instruction_rol_zeropage_x);
+        opcodes.insert(0x2e, instruction_rol_absolute);
+        opcodes.insert(0x3e, instruction_rol_absolute_x);
+        opcodes.insert(0x6a, instruction_ror_accumulator);
+        opcodes.insert(0x66, instruction_ror_zeropage);
+        opcodes.insert(0x76, instruction_ror_zeropage_x);
+        opcodes.insert(0x6e, instruction_ror_absolute);
+        opcodes.insert(0x7e, instruction_ror_absolute_x);
         CPU {opcodes: opcodes}
     }
 
@@ -3803,4 +3813,536 @@ fn test_instruction_dey() {
     nes.y.set(2);
     instruction_dey(&nes);
     assert_eq!(nes.y.get(), 1);
+}
+
+// Rotate Left Opcodes
+
+fn instruction_rol_accumulator(nes : &Nes) {
+    let mut a = nes.a.get();
+    if (a & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+
+    if(nes.processor_status_flag.get() & 1) != 0 {
+        a = a | 1;
+    }
+    
+    let result = a << 1;
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    nes.a.set(result);
+    nes.program_counter.set(nes.program_counter.get() + 1);
+}
+
+#[test]
+fn test_instruction_rol_accumulator() {
+    let nes = Nes::new();
+    nes.a.set(0b00000001);
+    nes.processor_status_flag.set(0);
+    instruction_rol_accumulator(&nes);
+    assert_eq!(nes.a.get(), 0b00000010);
+    nes.a.set(0b11111111);
+    nes.processor_status_flag.set(0);
+    instruction_rol_accumulator(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 0b10000001);
+    assert_eq!(nes.a.get(), 0b11111110);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    instruction_rol_accumulator(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
+}
+
+fn instruction_rol_zeropage(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let zero_address = memory[pc+1] as usize;
+    let  mut operand = memory[zero_address];
+    if (operand & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+
+    if(nes.processor_status_flag.get() & 1) != 0 {
+        operand = operand | 1;
+    }
+    
+    let result = operand << 1;
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    memory[zero_address] = result;
+    nes.program_counter.set(nes.program_counter.get() + 2);
+}
+
+#[test]
+fn test_instruction_rol_zeropage() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 0xfe;
+        memory[0xfe] = 1;
+        memory[3] = 0xff;
+        memory[0xff] = 0xff;
+        memory[5] = 0xfc;
+        memory[0xfc] = 0; 
+    }
+    nes.processor_status_flag.set(0);
+    instruction_rol_zeropage(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(memory[0xfe], 0b00000010);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_rol_zeropage(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(nes.processor_status_flag.get(), 0b10000001);
+    assert_eq!(memory[0xff], 0b11111110);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_rol_zeropage(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
+}
+
+fn instruction_rol_zeropage_x(nes :&Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let x = nes.x.get() as usize;
+    let zero_address = memory[pc+1] as usize;
+    let mut operand = memory[(zero_address + x) % 256];
+    if (operand & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+
+    if(nes.processor_status_flag.get() & 1) != 0 {
+        operand = operand | 1;
+    }
+    let result = operand << 1;
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    memory[(zero_address + x) % 256] = result;
+    nes.program_counter.set(nes.program_counter.get() + 2);
+}
+
+#[test]
+fn test_instruction_rol_zeropage_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 0xfa;
+        memory[0xfb] = 1;
+        memory[3] = 0xfc;
+        memory[0xfd] = 0xff;
+        memory[5] = 0xfe;
+        memory[0xff] = 0; 
+    }
+    nes.x.set(1);
+    nes.processor_status_flag.set(0);
+    instruction_rol_zeropage_x(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(memory[0xfb], 0b00000010);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_rol_zeropage_x(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(nes.processor_status_flag.get(), 0b10000001);
+    assert_eq!(memory[0xfd], 0b11111110);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_rol_zeropage_x(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
+}
+
+fn instruction_rol_absolute(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let total_address = (high_byte << 8) | low_byte;
+    let  mut operand = memory[total_address];
+    if (operand & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+
+    if(nes.processor_status_flag.get() & 1) != 0 {
+        operand = operand | 1;
+    }
+    let result = operand << 1;
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    memory[total_address] = result;
+    nes.program_counter.set(nes.program_counter.get() + 3);
+}
+
+#[test]
+fn test_instruction_rol_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2048] = 1;
+        memory[4] = 0xff;
+        memory[0xff] = 0xff;
+    }
+    nes.processor_status_flag.set(0);
+    instruction_rol_absolute(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(memory[2048], 0b00000010);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_rol_absolute(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(nes.processor_status_flag.get(), 0b10000001);
+    assert_eq!(memory[0xff], 0b11111110);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_rol_absolute(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
+}
+
+fn instruction_rol_absolute_x(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let x = nes.x.get() as usize;
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let total_address = (high_byte << 8) | low_byte;
+    let  mut operand = memory[total_address + x];
+    if (operand & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+
+    if(nes.processor_status_flag.get() & 1) != 0 {
+        operand = operand | 1;
+    }
+    let result = operand << 1;
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    memory[total_address + x] = result;
+    nes.program_counter.set(nes.program_counter.get() + 3);
+}
+
+#[test]
+fn test_instruction_rol_absolute_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2049] = 1;
+        memory[4] = 0xfe;
+        memory[0xff] = 0xff;
+    }
+    nes.x.set(1);
+    nes.processor_status_flag.set(0);
+    instruction_rol_absolute_x(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(memory[2049], 0b00000010);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_rol_absolute_x(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(nes.processor_status_flag.get(), 0b10000001);
+    assert_eq!(memory[0xff], 0b11111110);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_rol_absolute_x(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
+}
+
+// Rotate Right Opcodes
+
+fn instruction_ror_accumulator(nes : &Nes) {
+    let mut a = nes.a.get();
+    if(nes.processor_status_flag.get() & 1) != 0 {
+        a = a | 128;
+    }
+
+    if (a & 1) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+
+    let result = a >> 1;
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    nes.a.set(result);
+    nes.program_counter.set(nes.program_counter.get() + 1);
+}
+
+#[test]
+fn test_instruction_ror_accumulator() {
+    let nes = Nes::new();
+    nes.a.set(0b00000010);
+    nes.processor_status_flag.set(0);
+    instruction_ror_accumulator(&nes);
+    assert_eq!(nes.a.get(), 0b00000001);
+    nes.a.set(0b11111111);
+    nes.processor_status_flag.set(0);
+    instruction_ror_accumulator(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 0b0000001);
+    assert_eq!(nes.a.get(), 0b01111111);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    instruction_ror_accumulator(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
+}
+
+fn instruction_ror_zeropage(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let zero_address = memory[pc+1] as usize;
+    let  mut operand = memory[zero_address];
+    if (nes.processor_status_flag.get() & 1) != 0 {
+        operand = operand | 128;
+    }
+
+    if (operand & 1) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+    
+    let result = operand >> 1;
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    memory[zero_address] = result;
+    nes.program_counter.set(nes.program_counter.get() + 2);
+}
+
+#[test]
+fn test_instruction_ror_zeropage() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 0xfe;
+        memory[0xfe] = 2;
+        memory[3] = 0xff;
+        memory[0xff] = 0xff;
+        memory[5] = 0xfc;
+        memory[0xfc] = 0; 
+    }
+    nes.processor_status_flag.set(0);
+    instruction_ror_zeropage(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(memory[0xfe], 0b00000001);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_ror_zeropage(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(nes.processor_status_flag.get(), 1);
+    assert_eq!(memory[0xff], 0b01111111);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_ror_zeropage(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
+}
+
+fn instruction_ror_zeropage_x(nes :&Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let x = nes.x.get() as usize;
+    let zero_address = memory[pc+1] as usize;
+    let mut operand = memory[(zero_address + x) % 256];
+    if (nes.processor_status_flag.get() & 1) != 0 {
+        operand = operand | 128;
+    }
+
+    if (operand & 1) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+
+    let result = operand >> 1;
+
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    memory[(zero_address + x) % 256] = result;
+    nes.program_counter.set(nes.program_counter.get() + 2);
+}
+
+#[test]
+fn test_instruction_ror_zeropage_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[1] = 0xfa;
+        memory[0xfb] = 2;
+        memory[3] = 0xfc;
+        memory[0xfd] = 0xff;
+        memory[5] = 0xfe;
+        memory[0xff] = 0; 
+    }
+    nes.x.set(1);
+    nes.processor_status_flag.set(0);
+    instruction_ror_zeropage_x(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(memory[0xfb], 1);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_ror_zeropage_x(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(nes.processor_status_flag.get(), 1);
+    assert_eq!(memory[0xfd], 0b01111111);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_ror_zeropage_x(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
+}
+
+fn instruction_ror_absolute(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let total_address = (high_byte << 8) | low_byte;
+    let  mut operand = memory[total_address];
+    if (nes.processor_status_flag.get() & 1) != 0 {
+        operand = operand | 128;
+    }
+
+    if (operand & 1) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+
+    let result = operand >> 1;
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    memory[total_address] = result;
+    nes.program_counter.set(nes.program_counter.get() + 3);
+}
+
+#[test]
+fn test_instruction_ror_absolute() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2048] = 2;
+        memory[4] = 0xff;
+        memory[0xff] = 0xff;
+    }
+    nes.processor_status_flag.set(0);
+    instruction_ror_absolute(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(memory[2048], 0b00000001);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_ror_absolute(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(nes.processor_status_flag.get(), 0b00000001);
+    assert_eq!(memory[0xff], 0b01111111);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_ror_absolute(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
+}
+
+fn instruction_ror_absolute_x(nes : &Nes) {
+    let pc = nes.program_counter.get() as usize;
+    let mut memory = nes.memory.borrow_mut();
+    let x = nes.x.get() as usize;
+    let low_byte = memory[pc+1] as usize;
+    let high_byte = memory[pc+2] as usize;
+    let total_address = (high_byte << 8) | low_byte;
+    let  mut operand = memory[total_address + x];
+    if (nes.processor_status_flag.get() & 1) != 0 {
+        operand = operand | 128;
+    }
+
+    if (operand & 1) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 1);
+    }
+    
+    let result = operand >> 1;
+
+    if result == 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 2);
+    }
+
+    if (result & 128) != 0 {
+        nes.processor_status_flag.set(nes.processor_status_flag.get() | 128);
+    }
+    memory[total_address + x] = result;
+    nes.program_counter.set(nes.program_counter.get() + 3);
+}
+
+#[test]
+fn test_instruction_ror_absolute_x() {
+    let nes = Nes::new();
+    {
+        let mut memory = nes.memory.borrow_mut();
+        memory[2] = 8;
+        memory[2049] = 2;
+        memory[4] = 0xfe;
+        memory[0xff] = 0xff;
+    }
+    nes.x.set(1);
+    nes.processor_status_flag.set(0);
+    instruction_ror_absolute_x(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(memory[2049], 0b00000001);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_ror_absolute_x(&nes);
+    let memory = nes.memory.borrow_mut();
+    assert_eq!(nes.processor_status_flag.get(), 1);
+    assert_eq!(memory[0xff], 0b01111111);
+    nes.a.set(0);
+    nes.processor_status_flag.set(0);
+    drop(memory);
+    instruction_ror_absolute_x(&nes);
+    assert_eq!(nes.processor_status_flag.get(), 2);
 }

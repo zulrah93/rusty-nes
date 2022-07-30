@@ -206,7 +206,7 @@ fn test_instruction_lda_immediate() {
     let nes = Nes::new();
     {
         let mut memory = nes.memory.borrow_mut();
-        memory[1] = 69; // Set the operand to 69 😊
+        memory[1] = 69;
     }
     nes.program_counter.set(0);
     instruction_lda_immediate(&nes);
@@ -398,7 +398,7 @@ fn test_instruction_ldy_immediate() {
     let nes = Nes::new();
     {
         let mut memory = nes.memory.borrow_mut();
-        memory[1] = 69; // Set the operand to 69 😊
+        memory[1] = 69;
     }
     nes.program_counter.set(0);
     instruction_ldy_immediate(&nes);
@@ -512,7 +512,7 @@ fn test_instruction_ldx_immediate() {
     let nes = Nes::new();
     {
         let mut memory = nes.memory.borrow_mut();
-        memory[1] = 69; // Set the operand to 69 😊
+        memory[1] = 69;
     }
     nes.program_counter.set(0);
     instruction_ldx_immediate(&nes);
